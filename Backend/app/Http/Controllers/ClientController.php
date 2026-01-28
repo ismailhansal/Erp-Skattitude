@@ -13,10 +13,16 @@ class ClientController extends Controller
     }
 
     // Voir un client
-    public function show($id)
-    {
-        return Client::with(['devis', 'factures'])->findOrFail($id);
+   public function show($id)
+{
+    try {
+        $client = Client::findOrFail($id);
+        return response()->json($client); // pas de relations encore
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
     }
+}
+
 
     // Créer un client
    public function store(Request $request)

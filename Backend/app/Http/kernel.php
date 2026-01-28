@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Http;
+
+use Illuminate\Foundation\Http\Kernel as HttpKernel;
+use Fruitcake\Cors\HandleCors;
+
+class Kernel extends HttpKernel
+{
+    // Middleware global
+    protected $middleware = [
+        // ici tes middlewares globaux
+    ];
+
+    // Groupes de middleware
+    protected $middlewareGroups = [
+        'web' => [
+            // middlewares web
+        ],
+
+        'api' => [
+            HandleCors::class, // middleware CORS
+            'throttle:api',
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ],
+    ];
+
+    // Middleware pour les routes individuelles
+    protected $routeMiddleware = [
+        // middleware personnalisés ici
+    ];
+}

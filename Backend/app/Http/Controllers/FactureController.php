@@ -33,6 +33,7 @@ class FactureController extends Controller
             'taxe' => 'nullable|numeric',
             'condition_reglement' => 'required|string',
             'date_echeance' => 'required|date',
+           
         ]);
 
         // Calcul des totaux
@@ -45,17 +46,20 @@ class FactureController extends Controller
         $numero = $lastFacture ? 'FAC/2026/' . str_pad($lastFacture->id + 1, 4, '0', STR_PAD_LEFT) : 'FAC/2026/0001';
 
         $facture = Facture::create(array_merge($validated, [
-            'numero' => $numero,
+            'numero_facture' => $numero,
             'sous_total' => $sous_total,
             'tva' => $tva,
+            'date_facture' => now(),
+    'description' => $validated['description'], // accès correct
+
             'total_ttc' => $total_ttc,
-            'status' => 'impayé',
+            'statut' => 'impayé',
         ]));
 
         // Si création depuis un devis, mettre à jour statut devis
         if ($request->devis_id) {
             $devis = Devis::find($request->devis_id);
-            $devis->status = 'facturé';
+            $devis->statut = 'facturé';
             $devis->save();
         }
 

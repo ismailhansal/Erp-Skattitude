@@ -16,7 +16,22 @@ class Client extends Model
         'email'
     ];
 
-    // user_id sera automatiquement rempli
+
+    public function devis()
+    {
+        return $this->hasMany(Devis::class);
+    }
+
+    public function factures()
+    {
+        return $this->hasMany(Facture::class);
+    }
+
+    public function bonsLivraison()
+    {
+        return $this->hasMany(BonLivraison::class);
+    }
+
     
 }
 

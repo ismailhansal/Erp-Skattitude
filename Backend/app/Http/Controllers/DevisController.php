@@ -18,7 +18,7 @@ class DevisController extends Controller
     // Voir un devis
     public function show($id)
     {
-        return Devis::with(['client', 'factures', 'bonLivraison'])->findOrFail($id);
+        return Devis::with(['client'])->findOrFail($id);
     }
 
     // Créer un devis
@@ -34,6 +34,7 @@ class DevisController extends Controller
             'condition_reglement' => 'required|string',
             'date_evenement' => 'required|date',
             'bon_de_commande' => 'nullable|boolean',
+       
         ]);
 
         // Calcul des totaux
@@ -46,25 +47,20 @@ class DevisController extends Controller
         $numero = $lastDevis ? 'DEV/2026/' . str_pad($lastDevis->id + 1, 4, '0', STR_PAD_LEFT) : 'DEV/2026/0001';
 
         $devis = Devis::create(array_merge($validated, [
-            'numero' => $numero,
+            'numero_devis' => $numero,
             'sous_total' => $sous_total,
             'tva' => $tva,
             'total_ttc' => $total_ttc,
-            'status' => 'en_attente',
+            'statut' => 'en_attente',
             'date_devis' => now(),
         ]));
 
-        // Générer le bon de livraison automatiquement
-        $bon = BonLivraison::create([
-            'devis_id' => $devis->id,
-            'description' => $devis->description,
-            'quantite' => $devis->quantite,
-            'nombre_jours' => $devis->nombre_jours,
-            'date_creation' => now(),
-        ]);
+      
 
-        return response()->json($devis->load('client', 'bonLivraison'), 201);
+        return response()->json($devis->load('client'), 201);
     }
+
+// Créer un devis - version simple
 
     // Modifier un devis
     public function update(Request $request, $id)
