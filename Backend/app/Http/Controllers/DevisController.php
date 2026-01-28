@@ -21,6 +21,44 @@ class DevisController extends Controller
         return Devis::with(['client'])->findOrFail($id);
     }
 
+    public function getByClient($clientId)
+{
+    // Récupère tous les devis pour ce client
+    $devis = Devis::where('client_id', $clientId)->get();
+    return response()->json($devis);
+}
+
+public function getClientDevis($clientId, $devisId)
+{
+    // Vérifie que le devis appartient bien au client
+    $devis = Devis::where('id', $devisId)
+                  ->where('client_id', $clientId)
+                  ->firstOrFail();
+
+    return response()->json($devis);
+}
+
+
+public function factures($clientId, $devisId)
+{
+    // Vérifier que le devis appartient bien au client
+    $devis = Devis::where('id', $devisId)
+                  ->where('client_id', $clientId)
+                  ->first();
+
+    if (!$devis) {
+        return response()->json(['message' => 'Devis non trouvé'], 404);
+    }
+
+    // Récupérer les factures associées
+    $factures = $devis->factures; // si tu as la relation "factures" définie dans le modèle Devis
+
+    return response()->json($factures);
+}
+
+
+
+
     // Créer un devis
     public function store(Request $request)
     {

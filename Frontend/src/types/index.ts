@@ -1,15 +1,19 @@
 export interface Client {
   id: string;
-  societe: string;
+  nom_societe: string;
   adresse: string;
   ville: string;
-  codePostal: string;
+  codePostal?: string;
   pays: string;
   ice: string;
   telephone: string;
   email: string;
-  createdAt: Date;
+  created_at: string;
+  updated_at: string;
+  devis?: Devis[];
+  factures?: Facture[];
 }
+
 
 export interface LigneDocument {
   id: string;

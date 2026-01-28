@@ -28,3 +28,18 @@ Route::apiResource('bon-livraisons', BonLivraisonController::class);
 
 // Création facture depuis un devis
 Route::post('devis/{devis}/facture', [FactureController::class, 'store']);
+// Tous les devis d'un client spécifique
+Route::get('clients/{client}/devis', [App\Http\Controllers\DevisController::class, 'getByClient']);
+
+// Tous les factures d'un client spécifique
+Route::get('clients/{client}/factures', [App\Http\Controllers\FactureController::class, 'getByClient']);
+
+
+// Obtenir un devis précis pour un client précis
+Route::get('clients/{client}/devis/{devis}', [App\Http\Controllers\DevisController::class, 'getClientDevis']);
+
+//Obtenir les devis lies aux factures d'un client précis
+Route::get('/clients/{client}/devis/{devis}/factures', [DevisController::class, 'factures']);
+
+//R écupérer une facture précise pour un client précis
+Route::get('/clients/{client}/factures/{facture}', [FactureController::class, 'getFactureByClient']);

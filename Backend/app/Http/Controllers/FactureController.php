@@ -20,6 +20,37 @@ class FactureController extends Controller
         return Facture::with('client', 'devis')->findOrFail($id);
     }
 
+       public function getByClient($clientId)
+{
+    // Récupère toutes les factures pour ce client
+    $factures = Facture::where('client_id', $clientId)->get();
+    return response()->json($factures);
+}
+
+
+
+ public function getFactureByClient($clientId, $factureId)
+    {
+        // Cherche la facture qui correspond au client et à l'id
+        $facture = Facture::with('client', 'devis')
+            ->where('id', $factureId)
+            ->where('client_id', $clientId)
+            ->first();
+
+        if (!$facture) {
+            return response()->json(['message' => 'Facture non trouvée pour ce client'], 404);
+        }
+
+        return response()->json($facture);
+    }
+
+
+
+
+
+
+
+
     // Créer une facture directement
     public function store(Request $request)
     {

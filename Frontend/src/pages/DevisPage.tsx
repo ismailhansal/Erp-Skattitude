@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Eye, Edit, Trash2, Receipt } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { mockDevis, getClientById } from '@/data/mockData';
+import axios from 'axios';
 import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Devis, Client } from '@/types';
@@ -23,35 +23,80 @@ const DevisPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
-  const [devisList, setDevisList] = useState(mockDevis);
+  const [devisList, setDevisList] = useState<Devis[]>([]);
+  const [clientsMap, setClientsMap] = useState<Record<number, Client>>({});
+  const [loading, setLoading] = useState(true);
   const today = new Date();
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-MA', {
-      style: 'currency',
-      currency: 'MAD',
-    }).format(amount);
-  };
+  // Format montant
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount);
 
-  const devisWithClient = devisList.map((d) => ({
-    ...d,
-    client: getClientById(d.clientId)!,
-  }));
+  // Fetch tous les devis + clients
+  useEffect(() => {
+    const fetchDevis = async () => {
+      try {
+        const devisRes = await axios.get<any[]>('http://127.0.0.1:8000/api/devis');
+        const clientsIds = Array.from(new Set(devisRes.data.map(d => d.client_id)));
+        
+        // Fetch info clients
+        const clientsMapTemp: Record<number, Client> = {};
+        await Promise.all(clientsIds.map(async (id) => {
+          const res = await axios.get<Client>(`http://127.0.0.1:8000/api/clients/${id}`);
+          clientsMapTemp[id] = {
+            ...res.data,
+            id: Number(res.data.id),
+          };
+        }));
 
-  const filteredDevis = devisWithClient.filter(
-    (devis) =>
-      devis.numero.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      devis.client.societe.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+        setClientsMap(clientsMapTemp);
+
+        // Map devis
+        setDevisList(
+          devisRes.data.map(d => ({
+            ...d,
+            id: d.id.toString(),
+            clientId: d.client_id,
+            numero: d.numero_devis,
+            totalTTC: Number(d.total_ttc) || 0,
+            dateCreation: d.created_at ? new Date(d.created_at) : null,
+            dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
+            estFacture: d.statut === 'facturé',
+            statut: d.statut,
+          }))
+        );
+
+        setLoading(false);
+      } catch (err) {
+        console.error(err);
+        toast({ title: 'Erreur', description: 'Impossible de charger les devis', variant: 'destructive' });
+        setLoading(false);
+      }
+    };
+
+    fetchDevis();
+  }, []);
 
   const handleDelete = (devis: Devis) => {
-    setDevisList((prev) => prev.filter((d) => d.id !== devis.id));
+    setDevisList(prev => prev.filter(d => d.id !== devis.id));
     toast({
       title: 'Devis supprimé',
       description: `Le devis ${devis.numero} a été supprimé.`,
       variant: 'destructive',
     });
   };
+
+  // Ajoute info client à chaque devis
+  const devisWithClient = devisList.map(d => ({
+    ...d,
+    client: clientsMap[d.clientId],
+  }));
+
+  const filteredDevis = devisWithClient.filter(
+    (devis) =>
+      devis.numero.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (devis.client?.nom_societe || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const columns = [
     {
@@ -72,26 +117,26 @@ const DevisPage: React.FC = () => {
           }}
           className="text-primary hover:underline font-medium"
         >
-          {item.client.societe}
+          {item.client?.nom_societe || '—'}
         </button>
       ),
     },
     {
       key: 'totalTTC',
       header: 'Montant',
-      render: (item: Devis) => (
-        <span className="font-semibold">{formatCurrency(item.totalTTC)}</span>
-      ),
+      render: (item: Devis) => <span className="font-semibold">{formatCurrency(item.totalTTC)}</span>,
     },
     {
       key: 'dateCreation',
       header: 'Création',
-      render: (item: Devis) => format(item.dateCreation, 'dd MMM yyyy', { locale: fr }),
+      render: (item: Devis) =>
+        item.dateCreation ? format(item.dateCreation, 'dd MMM yyyy', { locale: fr }) : '-',
     },
     {
       key: 'dateEvenement',
       header: 'Événement',
       render: (item: Devis) => {
+        if (!item.dateEvenement) return '-';
         const isPast = !item.estFacture && isBefore(item.dateEvenement, today);
         return (
           <span className={isPast ? 'text-destructive font-medium' : ''}>
@@ -149,11 +194,14 @@ const DevisPage: React.FC = () => {
     },
   ];
 
+  if (loading)
+    return <p className="text-center mt-10">Chargement des devis...</p>;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Devis"
-        description="Gérez vos devis clients"
+        description="Gérez tous vos devis clients"
         actions={
           <Button onClick={() => navigate('/devis/nouveau')}>
             <Plus className="h-4 w-4 mr-2" />

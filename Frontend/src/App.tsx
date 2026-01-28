@@ -11,6 +11,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Clients from "./pages/Clients";
+import Clienttest from "./pages/Clienttest";
 import ClientDetail from "./pages/ClientDetail";
 import ClientVente from "./pages/ClientVente";
 import DevisPage from "./pages/DevisPage";
@@ -54,6 +55,8 @@ const AppRoutes = () => {
         
         {/* Module Clients - avec workflow intégré */}
         <Route path="clients" element={<Clients />} />
+        <Route path="clientstest" element={<Clienttest />} />
+
         <Route path="clients/:clientId" element={<ClientDetail />} />
         <Route path="clients/:clientId/vente" element={<ClientVente />} />
         {/* Routes devis dans contexte client */}

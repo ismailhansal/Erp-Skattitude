@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
@@ -27,15 +28,44 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 
+
+
+
+
 const Clients: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
-  const [clients, setClients] = useState<Client[]>(mockClients);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  //api laravel
+const [clients, setClients] = useState<Client[]>([]);
+const [loading, setLoading] = useState<boolean>(true);
+
+useEffect(() => {
+  axios
+    .get<Client[]>("http://127.0.0.1:8000/api/clients")
+    .then((res) => {
+      // Transformer id en string pour DataTable
+      const mapped = res.data.map((c) => ({
+        ...c,
+        id: c.id.toString(), // <-- ici
+      }));
+      setClients(mapped);
+      setLoading(false);
+    })
+    .catch((err) => {
+      console.error(err);
+      setLoading(false);
+    });
+}, []);
+
+
+//api laravel
+
+const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState({
-    societe: '',
+    nom_societe: '',
     adresse: '',
     ville: '',
     codePostal: '',
@@ -47,7 +77,7 @@ const Clients: React.FC = () => {
 
   const filteredClients = clients.filter(
     (client) =>
-      client.societe.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.nom_societe.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.ville.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -56,7 +86,7 @@ const Clients: React.FC = () => {
     if (client) {
       setEditingClient(client);
       setFormData({
-        societe: client.societe,
+        nom_societe: client.nom_societe,
         adresse: client.adresse,
         ville: client.ville,
         codePostal: client.codePostal,
@@ -68,7 +98,7 @@ const Clients: React.FC = () => {
     } else {
       setEditingClient(null);
       setFormData({
-        societe: '',
+        nom_societe: '',
         adresse: '',
         ville: '',
         codePostal: '',
@@ -81,50 +111,68 @@ const Clients: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (editingClient) {
-      setClients((prev) =>
-        prev.map((c) =>
-          c.id === editingClient.id ? { ...c, ...formData } : c
-        )
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (editingClient) {
+    // PUT vers Laravel
+    try {
+      const res = await axios.put<Client>(
+        `http://127.0.0.1:8000/api/clients/${editingClient.id}`,
+        formData
+      );
+      setClients(prev =>
+        prev.map(c => (c.id === editingClient.id ? res.data : c))
       );
       toast({
         title: 'Client modifié',
-        description: `${formData.societe} a été mis à jour.`,
+        description: `${res.data.nom_societe} a été mis à jour.`,
       });
-    } else {
-      const newClient: Client = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date(),
-      };
-      setClients((prev) => [...prev, newClient]);
+    } catch (err) {
+      console.error(err);
+    }
+  } else {
+    // POST vers Laravel
+    try {
+      const res = await axios.post<Client>(
+        "http://127.0.0.1:8000/api/clients",
+        formData
+      );
+      setClients(prev => [...prev, res.data]);
       toast({
         title: 'Client créé',
-        description: `${formData.societe} a été ajouté.`,
+        description: `${res.data.nom_societe} a été ajouté.`,
       });
+    } catch (err) {
+      console.error(err);
     }
-    
-    setIsDialogOpen(false);
-  };
+  }
 
-  const handleDelete = (client: Client) => {
-    setClients((prev) => prev.filter((c) => c.id !== client.id));
+  setIsDialogOpen(false);
+};
+
+  const handleDelete = async (client: Client) => {
+  try {
+    await axios.delete(`http://127.0.0.1:8000/api/clients/${client.id}`);
+    setClients(prev => prev.filter(c => c.id !== client.id));
     toast({
       title: 'Client supprimé',
-      description: `${client.societe} a été supprimé.`,
+      description: `${client.nom_societe} a été supprimé.`,
       variant: 'destructive',
     });
-  };
+    navigate('/clients');
+  } catch (err) {
+    console.error(err);
+  }
+};
+
 
   const columns = [
     {
       key: 'societe',
       header: 'Société',
       render: (item: Client) => (
-        <span className="font-semibold text-foreground">{item.societe}</span>
+        <span className="font-semibold text-foreground">{item.nom_societe}</span>
       ),
     },
     {
@@ -152,7 +200,7 @@ const Clients: React.FC = () => {
     {
       key: 'createdAt',
       header: 'Créé le',
-      render: (item: Client) => format(item.createdAt, 'dd MMM yyyy', { locale: fr }),
+      render: (item: Client) => format(item.created_at, 'dd MMM yyyy', { locale: fr }),
     },
     {
       key: 'actions',
@@ -242,8 +290,8 @@ const Clients: React.FC = () => {
                 <Label htmlFor="societe">Nom de la société *</Label>
                 <Input
                   id="societe"
-                  value={formData.societe}
-                  onChange={(e) => setFormData({ ...formData, societe: e.target.value })}
+                  value={formData.nom_societe}
+                  onChange={(e) => setFormData({ ...formData, nom_societe: e.target.value })}
                   required
                 />
               </div>

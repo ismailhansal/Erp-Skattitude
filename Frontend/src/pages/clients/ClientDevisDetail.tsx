@@ -1,22 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  FileText, 
-  Calendar, 
-  Printer, 
-  Edit, 
-  Receipt,
-  Truck,
-  ArrowLeft
+  FileText, Calendar, Printer, Edit, Receipt,
+  Truck, ArrowLeft
 } from 'lucide-react';
+import { format, isBefore } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import axios from 'axios';
+
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { mockDevis, getClientById, mockConfiguration, mockFactures } from '@/data/mockData';
-import { format, isBefore } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DevisPrintView } from '@/components/documents/DevisPrintView';
 import { BonLivraisonPrintView } from '@/components/documents/BonLivraisonPrintView';
@@ -25,33 +21,84 @@ const ClientDevisDetail: React.FC = () => {
   const { clientId, devisId } = useParams<{ clientId: string; devisId: string }>();
   const navigate = useNavigate();
   const today = new Date();
+
+  const [devis, setDevis] = useState<any>(null);
+  const [client, setClient] = useState<any>(null);
+  const [facturesAssociees, setFacturesAssociees] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [showDevisPrint, setShowDevisPrint] = useState(false);
   const [showBLPrint, setShowBLPrint] = useState(false);
 
-  const devis = mockDevis.find((d) => d.id === devisId);
-  const client = devis ? getClientById(devis.clientId) : null;
-  const facturesAssociees = mockFactures.filter((f) => f.devisId === devisId);
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-MA', {
-      style: 'currency',
-      currency: 'MAD',
-    }).format(amount);
-  };
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const devisRes = await axios.get(`http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}`);
+        const clientRes = await axios.get(`http://127.0.0.1:8000/api/clients/${clientId}`);
+        const facturesRes = await axios.get(`http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}/factures`);
+        console.log(facturesRes.data);
 
-  if (!devis || !client) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
-        <p className="text-muted-foreground">Devis non trouvé</p>
-        <Button variant="outline" onClick={() => navigate(`/clients/${clientId}/vente`)}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour aux ventes
-        </Button>
-      </div>
-    );
-  }
+        const d = devisRes.data;
+        setDevis({
+          ...d,
+          dateCreation: new Date(d.created_at),
+          dateEvenement: new Date(d.date_evenement),
+          estFacture: d.statut === 'facturé',
+          lignes: [
+            {
+              id: d.id,
+              description: d.description,
+              quantiteHotesses: d.quantite,
+              nombreJours: d.nombre_jours,
+              prixUnitaire: Number(d.prix_unitaire),
+              tva: Number(d.taxe),
+            },
+          ],
+          sousTotal: Number(d.sous_total),
+          montantTva: Number(d.tva),
+          totalTTC: Number(d.total_ttc),
+        });
 
-  const isPast = isBefore(devis.dateEvenement, today);
+        setClient(clientRes.data);
+const facturesData = Array.isArray(facturesRes.data)
+  ? facturesRes.data
+  : [facturesRes.data]; // transforme l'objet unique en tableau
+
+setFacturesAssociees(
+  facturesData.map(f => ({
+    ...f,
+    id: f.id.toString(),
+    date_facture: f.date_facture ? new Date(f.date_facture) : null,
+    date_echeance: f.date_echeance ? new Date(f.date_echeance) : null,
+    total_ttc: Number(f.total_ttc),
+  }))
+);
+
+       setLoading(false);
+      } catch (err) {
+        console.error(err);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [clientId, devisId]);
+
+  if (loading) return <div className="flex justify-center items-center h-96">Chargement...</div>;
+  if (!devis || !client) return (
+    <div className="flex flex-col items-center justify-center h-96 gap-4">
+      <p className="text-muted-foreground">Devis non trouvé</p>
+      <Button variant="outline" onClick={() => navigate(`/clients/${clientId}/vente`)}>
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Retour aux ventes
+      </Button>
+    </div>
+  );
+
+  const isPast = isBefore(devis.dateEvenement, today) && !devis.estFacture;
   const getStatus = () => {
     if (devis.estFacture) return 'invoiced';
     if (isPast) return 'toInvoice';
@@ -61,7 +108,7 @@ const ClientDevisDetail: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title={`Devis ${devis.numero}`}
+        title={`Devis ${devis.numero_devis}`}
         description={`Client: ${client.societe} • Créé le ${format(devis.dateCreation, 'dd MMMM yyyy', { locale: fr })}`}
         showBack
         backPath={`/clients/${clientId}/vente`}
@@ -69,68 +116,42 @@ const ClientDevisDetail: React.FC = () => {
           <div className="flex gap-2 flex-wrap">
             <Dialog open={showBLPrint} onOpenChange={setShowBLPrint}>
               <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Truck className="h-4 w-4 mr-2" />
-                  Bon de livraison
-                </Button>
+                <Button variant="outline"><Truck className="h-4 w-4 mr-2" />Bon de livraison</Button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto bg-card">
-                <DialogHeader>
-                  <DialogTitle>Bon de livraison</DialogTitle>
-                </DialogHeader>
-                <BonLivraisonPrintView 
-                  devis={devis} 
-                  client={client} 
-                  config={mockConfiguration} 
-                />
-              </DialogContent>
-            </Dialog>
-            
-            <Dialog open={showDevisPrint} onOpenChange={setShowDevisPrint}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimer
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto bg-card">
-                <DialogHeader>
-                  <DialogTitle>Aperçu du devis</DialogTitle>
-                </DialogHeader>
-                <DevisPrintView 
-                  devis={devis} 
-                  client={client} 
-                  config={mockConfiguration} 
-                />
+                <DialogHeader><DialogTitle>Bon de livraison</DialogTitle></DialogHeader>
+                <BonLivraisonPrintView devis={devis} client={client} />
               </DialogContent>
             </Dialog>
 
-            <Button 
-              variant="outline" 
-              onClick={() => navigate(`/clients/${clientId}/devis/${devisId}/edit`)}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Modifier
+            <Dialog open={showDevisPrint} onOpenChange={setShowDevisPrint}>
+              <DialogTrigger asChild>
+                <Button variant="outline"><Printer className="h-4 w-4 mr-2" />Imprimer</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto bg-card">
+                <DialogHeader><DialogTitle>Aperçu du devis</DialogTitle></DialogHeader>
+                <DevisPrintView devis={devis} client={client} />
+              </DialogContent>
+            </Dialog>
+
+            <Button variant="outline" onClick={() => navigate(`/clients/${clientId}/devis/${devisId}/edit`)}>
+              <Edit className="h-4 w-4 mr-2" />Modifier
             </Button>
-            
+
             {!devis.estFacture && (
               <Button onClick={() => navigate(`/clients/${clientId}/devis/${devisId}/facturer`)}>
-                <Receipt className="h-4 w-4 mr-2" />
-                Créer facture
+                <Receipt className="h-4 w-4 mr-2" />Créer facture
               </Button>
             )}
           </div>
         }
       />
 
-      {/* Status Alert */}
-      {isPast && !devis.estFacture && (
+      {isPast && (
         <Card className="border-destructive bg-destructive/5">
-          <CardContent className="py-4">
-            <p className="text-destructive font-medium flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              L'événement est passé. Veuillez facturer ce devis.
-            </p>
+          <CardContent className="py-4 flex gap-2 items-center text-destructive">
+            <Calendar className="h-5 w-5" />
+            L'événement est passé. Veuillez facturer ce devis.
           </CardContent>
         </Card>
       )}
@@ -140,44 +161,23 @@ const ClientDevisDetail: React.FC = () => {
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Détails du devis
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" />Détails du devis</CardTitle>
               <StatusBadge variant={getStatus()} />
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Infos générales */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Numéro</p>
-                <p className="font-mono font-medium text-foreground">{devis.numero}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Date de création</p>
-                <p className="font-medium text-foreground">{format(devis.dateCreation, 'dd MMMM yyyy', { locale: fr })}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Date de l'événement</p>
-                <p className={`font-medium ${isPast && !devis.estFacture ? 'text-destructive' : 'text-foreground'}`}>
-                  {format(devis.dateEvenement, 'dd MMMM yyyy', { locale: fr })}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Condition de règlement</p>
-                <p className="font-medium text-foreground">{devis.conditionReglement}</p>
-              </div>
-              {devis.bonCommande && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Bon de commande</p>
-                  <p className="font-medium text-foreground">{devis.bonCommande}</p>
-                </div>
-              )}
+              <div><p className="text-sm text-muted-foreground">Numéro</p><p className="font-mono font-medium text-foreground">{devis.numero_devis}</p></div>
+              <div><p className="text-sm text-muted-foreground">Date de création</p><p className="font-medium text-foreground">{format(devis.dateCreation, 'dd MMMM yyyy', { locale: fr })}</p></div>
+              <div><p className="text-sm text-muted-foreground">Date de l'événement</p><p className={`font-medium ${isPast ? 'text-destructive' : 'text-foreground'}`}>{format(devis.dateEvenement, 'dd MMMM yyyy', { locale: fr })}</p></div>
+              <div><p className="text-sm text-muted-foreground">Condition de règlement</p><p className="font-medium text-foreground">{devis.condition_reglement}</p></div>
+              {devis.bon_commande && <div><p className="text-sm text-muted-foreground">Bon de commande</p><p className="font-medium text-foreground">{devis.bon_commande}</p></div>}
             </div>
 
             <Separator />
 
-            {/* Lignes */}
+            {/* Lignes du devis */}
             <div>
               <h4 className="font-medium mb-4 text-foreground">Prestations</h4>
               <div className="border border-border rounded-lg overflow-hidden">
@@ -200,9 +200,7 @@ const ClientDevisDetail: React.FC = () => {
                         <td className="p-3 text-center text-foreground">{ligne.nombreJours}</td>
                         <td className="p-3 text-right text-foreground">{formatCurrency(ligne.prixUnitaire)}</td>
                         <td className="p-3 text-right text-foreground">{ligne.tva}%</td>
-                        <td className="p-3 text-right font-medium text-foreground">
-                          {formatCurrency(ligne.quantiteHotesses * ligne.nombreJours * ligne.prixUnitaire)}
-                        </td>
+                        <td className="p-3 text-right font-medium text-foreground">{formatCurrency(ligne.quantiteHotesses * ligne.nombreJours * ligne.prixUnitaire)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -215,19 +213,10 @@ const ClientDevisDetail: React.FC = () => {
             {/* Totaux */}
             <div className="flex justify-end">
               <div className="w-72 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Sous-total HT</span>
-                  <span className="text-foreground">{formatCurrency(devis.sousTotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">TVA (20%)</span>
-                  <span className="text-foreground">{formatCurrency(devis.montantTva)}</span>
-                </div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Sous-total HT</span><span className="text-foreground">{formatCurrency(devis.sousTotal)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">TVA</span><span className="text-foreground">{formatCurrency(devis.montantTva)}</span></div>
                 <Separator />
-                <div className="flex justify-between text-lg font-bold">
-                  <span className="text-foreground">Total TTC</span>
-                  <span className="text-primary">{formatCurrency(devis.totalTTC)}</span>
-                </div>
+                <div className="flex justify-between text-lg font-bold"><span className="text-foreground">Total TTC</span><span className="text-primary">{formatCurrency(devis.totalTTC)}</span></div>
               </div>
             </div>
           </CardContent>
@@ -237,28 +226,24 @@ const ClientDevisDetail: React.FC = () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Receipt className="h-4 w-4 text-primary" />
-                Factures associées
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base"><Receipt className="h-4 w-4 text-primary" />Factures associées</CardTitle>
             </CardHeader>
             <CardContent>
               {facturesAssociees.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Aucune facture</p>
               ) : (
                 <div className="space-y-2">
-                  {facturesAssociees.map((facture) => (
-                    <button
-                      key={facture.id}
-                      onClick={() => navigate(`/clients/${clientId}/factures/${facture.id}`)}
-                      className="w-full text-left p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                    >
-                      <p className="font-mono font-medium text-foreground">{facture.numero}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatCurrency(facture.totalTTC)}
-                      </p>
-                    </button>
-                  ))}
+                {facturesAssociees.map((facture) => (
+  <button
+    key={facture.id}
+    onClick={() => navigate(`/clients/${clientId}/factures/${facture.id}`)}
+    className="w-full text-left p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+  >
+    <p className="font-mono font-medium text-foreground">{facture.numero_facture}</p>
+    <p className="text-sm text-muted-foreground">{formatCurrency(facture.total_ttc)}</p>
+  </button>
+))}
+
                 </div>
               )}
             </CardContent>
