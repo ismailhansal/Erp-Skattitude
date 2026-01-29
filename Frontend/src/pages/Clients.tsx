@@ -110,26 +110,48 @@ const [isDialogOpen, setIsDialogOpen] = useState(false);
 
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
+    console.log('editingClient', editingClient);
+  console.log('formData', formData);
 
- 
-    // POST vers Laravel
-    try {
+
+  try {
+    if (editingClient) {
+      // 🔁 UPDATE
+      const res = await axios.put<Client>(
+        `http://127.0.0.1:8000/api/clients/${editingClient.id}`,
+        formData
+      );
+
+      setClients(prev =>
+        prev.map(c => (c.id === editingClient.id ? res.data : c))
+      );
+
+      toast({
+        title: 'Client modifié',
+        description: `${res.data.nom_societe} a été mis à jour.`,
+      });
+    } else {
+      // ➕ CREATE
       const res = await axios.post<Client>(
         "http://127.0.0.1:8000/api/clients",
         formData
       );
+
       setClients(prev => [...prev, res.data]);
+
       toast({
         title: 'Client créé',
         description: `${res.data.nom_societe} a été ajouté.`,
       });
-    } catch (err) {
-      console.error(err);
     }
-  
 
-  setIsDialogOpen(false);
+    setIsDialogOpen(false);
+    setEditingClient(null);
+  } catch (err) {
+    console.error(err);
+  }
 };
+
 
   const handleDelete = async (client: Client) => {
       try {
@@ -194,21 +216,37 @@ const handleSubmit = async (e: React.FormEvent) => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/clients/${item.id}`)}>
-              <Eye className="h-4 w-4 mr-2" />
-              Voir
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleOpenDialog(item)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Modifier
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleDelete(item)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Supprimer
-            </DropdownMenuItem>
+           <DropdownMenuItem
+  onClick={(e) => {
+    e.stopPropagation();
+    navigate(`/clients/${item.id}`);
+  }}
+>
+  <Eye className="h-4 w-4 mr-2" />
+  Voir
+</DropdownMenuItem>
+
+<DropdownMenuItem
+  onClick={(e) => {
+    e.stopPropagation();
+    handleOpenDialog(item);
+  }}
+>
+  <Edit className="h-4 w-4 mr-2" />
+  Modifier
+</DropdownMenuItem>
+
+<DropdownMenuItem
+  onClick={(e) => {
+    e.stopPropagation();
+    handleDelete(item);
+  }}
+  className="text-destructive focus:text-destructive"
+>
+  <Trash2 className="h-4 w-4 mr-2" />
+  Supprimer
+</DropdownMenuItem>
+
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -221,10 +259,14 @@ const handleSubmit = async (e: React.FormEvent) => {
         title="Clients"
         description="Gérez votre portefeuille clients"
         actions={
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouveau client
-          </Button>
+       <Button onClick={() => {
+  setEditingClient(null); // ✅ forcer null
+  handleOpenDialog();
+}}>
+  <Plus className="h-4 w-4 mr-2" />
+  Nouveau client
+</Button>
+
         }
       />
 

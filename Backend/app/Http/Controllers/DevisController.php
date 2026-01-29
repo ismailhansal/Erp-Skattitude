@@ -6,19 +6,21 @@ use Illuminate\Http\Request;
 use App\Models\Devis;
 use App\Models\Client;
 use App\Models\BonLivraison;
+use App\Models\DevisLigne;
 
 class DevisController extends Controller
 {
        // Liste tous les devis
     public function index()
     {
-        return Devis::with('client')->get();
+        return Devis::with(['client', 'lignes'])->get();
+
     }
 
     // Voir un devis
     public function show($id)
     {
-        return Devis::with(['client'])->findOrFail($id);
+        return Devis::with(['client', 'lignes'])->findOrFail($id);
     }
 
     public function getByClient($clientId)
@@ -30,10 +32,10 @@ class DevisController extends Controller
 
 public function getClientDevis($clientId, $devisId)
 {
-    // Vérifie que le devis appartient bien au client
-    $devis = Devis::where('id', $devisId)
-                  ->where('client_id', $clientId)
-                  ->firstOrFail();
+    $devis = Devis::with('lignes') // 🔥 ICI
+        ->where('id', $devisId)
+        ->where('client_id', $clientId)
+        ->firstOrFail();
 
     return response()->json($devis);
 }

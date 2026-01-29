@@ -42,25 +42,26 @@ const ClientDevisDetail: React.FC = () => {
         console.log(facturesRes.data);
 
         const d = devisRes.data;
-        setDevis({
-          ...d,
-          dateCreation: new Date(d.created_at),
-          dateEvenement: new Date(d.date_evenement),
-          estFacture: d.statut === 'facturé',
-          lignes: [
-            {
-              id: d.id,
-              description: d.description,
-              quantiteHotesses: d.quantite,
-              nombreJours: d.nombre_jours,
-              prixUnitaire: Number(d.prix_unitaire),
-              tva: Number(d.taxe),
-            },
-          ],
-          sousTotal: Number(d.sous_total),
-          montantTva: Number(d.tva),
-          totalTTC: Number(d.total_ttc),
-        });
+       setDevis({
+  ...d,
+  dateCreation: new Date(d.created_at),
+  dateEvenement: new Date(d.date_evenement),
+  estFacture: d.statut === 'facturé',
+
+  lignes: d.lignes.map((ligne: any) => ({
+    id: ligne.id,
+    description: ligne.description,
+    quantiteHotesses: ligne.quantite,
+    nombreJours: ligne.nombre_jours,
+    prixUnitaire: Number(ligne.prix_unitaire),
+    tva: Number(ligne.tva),
+  })),
+
+  sousTotal: Number(d.sous_total),
+  montantTva: Number(d.tva),
+  totalTTC: Number(d.total_ttc),
+});
+
 
         setClient(clientRes.data);
 const facturesData = Array.isArray(facturesRes.data)
@@ -109,7 +110,7 @@ setFacturesAssociees(
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title={`Devis ${devis.numero_devis}`}
-        description={`Client: ${client.societe} • Créé le ${format(devis.dateCreation, 'dd MMMM yyyy', { locale: fr })}`}
+        description={`Client: ${client.nom_societe} • Créé le ${format(devis.dateCreation, 'dd MMMM yyyy', { locale: fr })}`}
         showBack
         backPath={`/clients/${clientId}/vente`}
         actions={
