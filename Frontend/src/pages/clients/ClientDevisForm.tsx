@@ -9,16 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockDevis, mockClients } from '@/data/mockData';
+import { mockClients } from '@/data/mockData';
 import { format } from 'date-fns';
 import { LigneDocument } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-
-const generateDevisNumber = () => {
-  const year = new Date().getFullYear();
-  const nextNumber = mockDevis.length + 1;
-  return `DEV/${year}/${String(nextNumber).padStart(4, '0')}`;
-};
 
 const ClientDevisForm: React.FC = () => {
   const { clientId, devisId } = useParams<{ clientId: string; devisId: string }>();
@@ -27,30 +21,20 @@ const ClientDevisForm: React.FC = () => {
   
   const isEdit = !!devisId;
   const client = mockClients.find(c => c.id === clientId);
-  const existingDevis = isEdit ? mockDevis.find((d) => d.id === devisId) : null;
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [dateEvenement, setDateEvenement] = useState(
-    existingDevis ? format(existingDevis.dateEvenement, 'yyyy-MM-dd') : ''
-  );
-  const [conditionReglement, setConditionReglement] = useState(existingDevis?.conditionReglement || '30 jours fin de mois');
-  const [bonCommande, setBonCommande] = useState(existingDevis?.bonCommande || '');
-  const [lignes, setLignes] = useState<Omit<LigneDocument, 'id'>[]>(
-    existingDevis?.lignes.map(l => ({
-      description: l.description,
-      quantiteHotesses: l.quantiteHotesses,
-      nombreJours: l.nombreJours,
-      prixUnitaire: l.prixUnitaire,
-      tva: l.tva,
-    })) || [
-      {
-        description: '',
-        quantiteHotesses: 1,
-        nombreJours: 1,
-        prixUnitaire: 0,
-        tva: 20,
-      },
-    ]
-  );
+  const [dateEvenement, setDateEvenement] = useState('');
+  const [conditionReglement, setConditionReglement] = useState('30 jours fin de mois');
+  const [bonCommande, setBonCommande] = useState('');
+  const [lignes, setLignes] = useState<Omit<LigneDocument, 'id'>[]>([
+    {
+      description: '',
+      quantiteHotesses: 1,
+      nombreJours: 1,
+      prixUnitaire: 0,
+      tva: 20,
+    },
+  ]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-MA', {
@@ -107,13 +91,10 @@ const ClientDevisForm: React.FC = () => {
   const { sousTotal, montantTva, totalTTC } = calculateTotals();
 
   const getBackPath = () => {
-    if (isEdit) {
-      return `/clients/${clientId}/devis/${devisId}`;
-    }
     return `/clients/${clientId}/vente`;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!dateEvenement) {
@@ -135,17 +116,61 @@ const ClientDevisForm: React.FC = () => {
       return;
     }
 
-    toast({
-      title: isEdit ? 'Devis modifié' : 'Devis créé',
-      description: isEdit 
-        ? `Le devis ${existingDevis?.numero} a été modifié.`
-        : `Le devis ${generateDevisNumber()} a été créé.`,
-    });
+    setIsLoading(true);
 
-    if (isEdit) {
-      navigate(`/clients/${clientId}/devis/${devisId}`);
-    } else {
+    try {
+      // Pour l'instant, on envoie la première ligne comme devis simple
+      // À adapter selon vos besoins exacts
+          const devisData = {
+            client_id: clientId,
+            date_evenement: dateEvenement,
+            condition_reglement: conditionReglement,
+            bon_commande: bonCommande,
+            lignes: lignes.map(l => ({
+              description: l.description,
+              quantite: l.quantiteHotesses, // ou renommer côté frontend en `quantite`
+              nombre_jours: l.nombreJours,
+              prix_unitaire: l.prixUnitaire,
+              tva: l.tva,
+            })),
+            // Les totaux peuvent être calculés côté backend si tu veux
+            sous_total: sousTotal,
+            tva: montantTva,
+            total_ttc: totalTTC,
+          };
+
+
+      const response = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}/devis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(devisData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erreur lors de la création du devis');
+      }
+
+      const newDevis = await response.json();
+
+      toast({
+        title: 'Devis créé',
+        description: `Le devis ${newDevis.numero_devis} a été créé avec succès.`,
+      });
+
       navigate(`/clients/${clientId}/vente`);
+    } catch (error) {
+      console.error('Erreur lors de la création du devis:', error);
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Une erreur est survenue lors de la création du devis.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -160,7 +185,7 @@ const ClientDevisForm: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title={isEdit ? `Modifier ${existingDevis?.numero}` : 'Nouveau devis'}
+        title='Nouveau devis'
         description={`Client: ${client.societe}`}
         showBack
         backPath={getBackPath()}
@@ -340,9 +365,9 @@ const ClientDevisForm: React.FC = () => {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Button type="submit" className="w-full">
+                  <Button type="submit" className="w-full" disabled={isLoading}>
                     <Save className="h-4 w-4 mr-2" />
-                    {isEdit ? 'Enregistrer' : 'Créer le devis'}
+                    {isLoading ? 'Création en cours...' : 'Créer le devis'}
                   </Button>
                   <Button 
                     type="button" 

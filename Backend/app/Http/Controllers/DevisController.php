@@ -72,9 +72,9 @@ public function factures($clientId, $devisId)
         'bon_commande' => 'nullable|string',
         'lignes' => 'required|array|min:1',
         'lignes.*.description' => 'required|string',
-        'lignes.*.quantiteHotesses' => 'required|integer|min:1',
-        'lignes.*.nombreJours' => 'required|integer|min:1',
-        'lignes.*.prixUnitaire' => 'required|numeric|min:0',
+        'lignes.*.quantite' => 'required|integer|min:1',
+        'lignes.*.nombre_jours' => 'required|integer|min:1',
+        'lignes.*.prix_unitaire' => 'required|numeric|min:0',
         'lignes.*.tva' => 'required|numeric|min:0',
     ]);
 
@@ -103,18 +103,21 @@ public function factures($clientId, $devisId)
 
         // Créer les lignes
         foreach ($validated['lignes'] as $ligne) {
-            $ligne_total = $ligne['quantiteHotesses'] * $ligne['nombreJours'] * $ligne['prixUnitaire'];
-            $ligne_tva = ($ligne_total * $ligne['tva']) / 100;
+        $ligne_total = $ligne['quantite'] * $ligne['nombre_jours'] * $ligne['prix_unitaire'];
+        $ligne_tva = ($ligne_total * $ligne['tva']) / 100;
+
             $sous_total += $ligne_total;
             $tva_total += $ligne_tva;
 
             $devis->lignes()->create([
-                'description' => $ligne['description'],
-                'quantiteHotesses' => $ligne['quantiteHotesses'],
-                'nombreJours' => $ligne['nombreJours'],
-                'prixUnitaire' => $ligne['prixUnitaire'],
-                'tva' => $ligne['tva'],
-            ]);
+            'description' => $ligne['description'],
+            'quantite' => $ligne['quantite'],
+            'nombre_jours' => $ligne['nombre_jours'],
+            'prix_unitaire' => $ligne['prix_unitaire'],
+            'tva' => $ligne['tva'],
+        ]);
+
+            
         }
 
         // Mettre à jour le total

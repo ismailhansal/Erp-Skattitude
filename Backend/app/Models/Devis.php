@@ -25,6 +25,11 @@ class Devis extends Model
         return $this->hasOne(Facture::class);
     }
 
+    public function lignes()
+{
+    return $this->hasMany(DevisLigne::class);
+}
+
     public function bonLivraison() {
         return $this->hasOne(BonLivraison::class);
     }
