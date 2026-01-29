@@ -1,86 +1,145 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Receipt, 
   Calendar, 
-  Building2, 
   Printer, 
-  Edit, 
-  Send,
+  Edit,
   FileText,
   ArrowLeft,
   CheckCircle2
 } from 'lucide-react';
+import { format, isBefore, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import axios from 'axios';
+
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { mockFactures, getClientById, mockConfiguration, mockDevis } from '@/data/mockData';
-import { format, isBefore } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FacturePrintView } from '@/components/documents/FacturePrintView';
 import { useToast } from '@/hooks/use-toast';
 
-const FactureDetail: React.FC = () => {
+interface LigneFacture {
+  id: number;
+  description: string;
+  quantite: number;
+  nombre_jours: number;
+  prix_unitaire: number;
+  tva: number;
+}
+
+interface Client {
+  id: number;
+  nom_societe: string;
+  ice: string;
+  email: string;
+  adresse: string;
+  ville: string;
+  pays: string;
+  telephone: string;
+}
+
+interface Devis {
+  id: number;
+  numero_devis: string;
+  date_creation: string;
+  date_evenement: string;
+  bon_commande?: string;
+}
+
+interface Facture {
+  id: number;
+  numero_facture: string;
+  client_id: number;
+  devis_id?: number;
+  date_facture: string;
+  date_echeance: string;
+  description: string;
+  quantite: number;
+  nombre_jours: number;
+  prix_unitaire: number;
+  tva: number;
+  sous_total: number;
+  total_ttc: number;
+  condition_reglement: string;
+  statut: string;
+  client: Client;
+  devis?: Devis;
+  lignes: LigneFacture[];
+}
+
+const FactureDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
   const today = new Date();
-  const [showFacturePrint, setShowFacturePrint] = useState(false);
 
-  // Determine back path based on where user came from
-  const getBackPath = () => {
-    const referrer = location.state?.from;
-    if (referrer === 'dashboard') return '/dashboard';
-    if (referrer === 'comptabilite') return '/comptabilite';
-    if (referrer?.startsWith('/clients/')) return referrer;
-    if (referrer?.startsWith('/devis/')) return referrer;
-    return '/factures';
+  const [facture, setFacture] = useState<Facture | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showPrint, setShowPrint] = useState(false);
+
+  const parseDateSafe = (dateStr?: string) => {
+    if (!dateStr) return null;
+    try { return parseISO(dateStr); } catch { return null; }
   };
 
-  const facture = mockFactures.find((f) => f.id === id);
-  const client = facture ? getClientById(facture.clientId) : null;
-  const devisOrigine = facture?.devisId ? mockDevis.find((d) => d.id === facture.devisId) : null;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-MA', {
-      style: 'currency',
-      currency: 'MAD',
-    }).format(amount);
+  const formatDate = (dateStr?: string) => {
+    const date = parseDateSafe(dateStr);
+    return date ? format(date, 'dd MMMM yyyy', { locale: fr }) : '—';
   };
+
+  const formatCurrency = (amount: number | string) =>
+    new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(Number(amount));
+
+  useEffect(() => {
+    const fetchFacture = async () => {
+      try {
+        setLoading(true);
+        const res = await axios.get<Facture>(`http://127.0.0.1:8000/api/factures/${id}`);
+        setFacture(res.data);
+      } catch (err) {
+        console.error(err);
+        setError('Impossible de charger la facture.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFacture();
+  }, [id]);
 
   const handleRelancer = () => {
+    if (!facture) return;
     toast({
       title: 'Relance envoyée',
-      description: `Une relance a été envoyée à ${client?.email}`,
+      description: `Une relance a été envoyée à ${facture.client.email}`,
     });
   };
 
   const handleMarquerPayee = () => {
+    if (!facture) return;
     toast({
       title: 'Facture marquée comme payée',
-      description: `La facture ${facture?.numero} a été marquée comme payée.`,
+      description: `La facture ${facture.numero_facture} a été marquée comme payée.`,
     });
   };
 
-  if (!facture || !client) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
-        <p className="text-muted-foreground">Facture non trouvée</p>
-        <Button variant="outline" onClick={() => navigate('/factures')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour aux factures
-        </Button>
-      </div>
-    );
-  }
+  if (loading) return <p>Chargement...</p>;
+  if (error || !facture) return (
+    <div className="flex flex-col items-center justify-center h-96 gap-4">
+      <p className="text-muted-foreground">{error || 'Facture non trouvée'}</p>
+      <Button variant="outline" onClick={() => navigate(`/factures`)}>
+        <ArrowLeft className="h-4 w-4 mr-2" />Retour aux factures
+      </Button>
+    </div>
+  );
 
-  const isOverdue = !facture.estPayee && isBefore(facture.dateEcheance, today);
+  const isOverdue = facture.statut !== 'payee' && parseDateSafe(facture.date_echeance) && isBefore(parseDateSafe(facture.date_echeance)!, today);
   const getStatus = () => {
-    if (facture.estPayee) return 'paid';
+    if (facture.statut === 'payee') return 'paid';
     if (isOverdue) return 'overdue';
     return 'unpaid';
   };
@@ -88,48 +147,32 @@ const FactureDetail: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title={`Facture ${facture.numero}`}
-        description={`Émise le ${format(facture.dateFacturation, 'dd MMMM yyyy', { locale: fr })}`}
+        title={`Facture ${facture.numero_facture}`}
+        description={`Client: ${facture.client.nom_societe} • Émise le ${formatDate(facture.date_facture)}`}
         showBack
-        backPath={getBackPath()}
+        backPath={`/factures`}
         actions={
           <div className="flex gap-2 flex-wrap">
-            <Dialog open={showFacturePrint} onOpenChange={setShowFacturePrint}>
+            <Dialog open={showPrint} onOpenChange={setShowPrint}>
               <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimer
-                </Button>
+                <Button variant="outline"><Printer className="h-4 w-4 mr-2" />Imprimer</Button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto bg-card">
-                <DialogHeader>
-                  <DialogTitle>Aperçu de la facture</DialogTitle>
-                </DialogHeader>
-                <FacturePrintView 
-                  facture={facture} 
-                  client={client} 
-                  config={mockConfiguration}
-                  devisOrigine={devisOrigine}
-                />
+                <DialogHeader><DialogTitle>Aperçu de la facture</DialogTitle></DialogHeader>
+                <FacturePrintView facture={facture} client={facture.client} config={{}} devisOrigine={facture.devis} />
               </DialogContent>
             </Dialog>
 
-            <Button 
-              variant="outline" 
-              onClick={() => navigate(`/factures/${id}/edit`, { state: { from: location.pathname } })}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Modifier
+            <Button variant="outline" onClick={() => navigate(`/factures/${facture.id}/edit`)}>
+              <Edit className="h-4 w-4 mr-2" />Modifier
             </Button>
-            
-            {!facture.estPayee && (
+
+            {facture.statut !== 'payee' && (
               <>
                 <Button variant="outline" onClick={handleRelancer}>
-                  <Send className="h-4 w-4 mr-2" />
                   Relancer
                 </Button>
                 <Button onClick={handleMarquerPayee}>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
                   Marquer payée
                 </Button>
               </>
@@ -138,93 +181,35 @@ const FactureDetail: React.FC = () => {
         }
       />
 
-      {/* Status Alert */}
       {isOverdue && (
         <Card className="border-destructive bg-destructive/5">
           <CardContent className="py-4">
             <p className="text-destructive font-medium flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Cette facture est en retard de paiement. Échéance: {format(facture.dateEcheance, 'dd MMMM yyyy', { locale: fr })}
+              <Calendar className="h-5 w-5" />Cette facture est en retard. Échéance: {formatDate(facture.date_echeance)}
             </p>
           </CardContent>
         </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Info */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-primary" />
-                Détails de la facture
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" />Détails de la facture</CardTitle>
               <StatusBadge variant={getStatus()} />
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Numéro</p>
-                <p className="font-mono font-medium text-foreground">{facture.numero}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Date de facturation</p>
-                <p className="font-medium text-foreground">{format(facture.dateFacturation, 'dd MMMM yyyy', { locale: fr })}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Date d'échéance</p>
-                <p className={`font-medium ${isOverdue ? 'text-destructive' : 'text-foreground'}`}>
-                  {format(facture.dateEcheance, 'dd MMMM yyyy', { locale: fr })}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Condition de règlement</p>
-                <p className="font-medium text-foreground">{facture.conditionReglement}</p>
-              </div>
+              <div><p className="text-sm text-muted-foreground">Numéro</p><p className="font-mono font-medium text-foreground">{facture.numero_facture}</p></div>
+              <div><p className="text-sm text-muted-foreground">Date</p><p className="font-medium text-foreground">{formatDate(facture.date_facture)}</p></div>
+              <div><p className="text-sm text-muted-foreground">Échéance</p><p className={`font-medium ${isOverdue ? 'text-destructive' : 'text-foreground'}`}>{formatDate(facture.date_echeance)}</p></div>
+              <div><p className="text-sm text-muted-foreground">Condition de règlement</p><p className="font-medium text-foreground">{facture.condition_reglement}</p></div>
+              <div><p className="text-sm text-muted-foreground">ICE Client</p><p className="font-mono text-sm text-foreground">{facture.client.ice}</p></div>
             </div>
-
-            {/* Section Origine - visible si créée depuis un devis */}
-            {devisOrigine && (
-              <>
-                <Separator />
-                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                  <h4 className="font-medium mb-3 text-foreground flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    Origine de la facture
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Devis d'origine</p>
-                      <button 
-                        onClick={() => navigate(`/devis/${devisOrigine.id}`, { state: { from: location.pathname } })}
-                        className="font-mono font-medium text-primary hover:underline"
-                      >
-                        {devisOrigine.numero}
-                      </button>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Date du devis</p>
-                      <p className="font-medium text-foreground">{format(devisOrigine.dateCreation, 'dd MMMM yyyy', { locale: fr })}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Date de l'événement</p>
-                      <p className="font-medium text-foreground">{format(devisOrigine.dateEvenement, 'dd MMMM yyyy', { locale: fr })}</p>
-                    </div>
-                    {devisOrigine.bonCommande && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Bon de commande</p>
-                        <p className="font-medium text-foreground">{devisOrigine.bonCommande}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
 
             <Separator />
 
-            {/* Lignes */}
             <div>
               <h4 className="font-medium mb-4 text-foreground">Prestations</h4>
               <div className="border border-border rounded-lg overflow-hidden">
@@ -240,18 +225,17 @@ const FactureDetail: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {facture.lignes.map((ligne) => (
-                      <tr key={ligne.id} className="border-t border-border">
-                        <td className="p-3 text-foreground">{ligne.description}</td>
-                        <td className="p-3 text-center text-foreground">{ligne.quantiteHotesses}</td>
-                        <td className="p-3 text-center text-foreground">{ligne.nombreJours}</td>
-                        <td className="p-3 text-right text-foreground">{formatCurrency(ligne.prixUnitaire)}</td>
-                        <td className="p-3 text-right text-foreground">{ligne.tva}%</td>
-                        <td className="p-3 text-right font-medium text-foreground">
-                          {formatCurrency(ligne.quantiteHotesses * ligne.nombreJours * ligne.prixUnitaire)}
-                        </td>
-                      </tr>
-                    ))}
+                    {(facture.lignes || []).map(l => (
+  <tr key={l.id} className="border-t border-border">
+    <td className="p-3 text-foreground">{l.description}</td>
+    <td className="p-3 text-center text-foreground">{l.quantite}</td>
+    <td className="p-3 text-center text-foreground">{l.nombre_jours}</td>
+    <td className="p-3 text-right text-foreground">{formatCurrency(l.prix_unitaire)}</td>
+    <td className="p-3 text-right text-foreground">{l.tva}%</td>
+    <td className="p-3 text-right font-medium text-foreground">{formatCurrency(l.quantite * l.nombre_jours * l.prix_unitaire)}</td>
+  </tr>
+))}
+
                   </tbody>
                 </table>
               </div>
@@ -259,88 +243,46 @@ const FactureDetail: React.FC = () => {
 
             <Separator />
 
-            {/* Totaux */}
             <div className="flex justify-end">
               <div className="w-72 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Sous-total HT</span>
-                  <span className="text-foreground">{formatCurrency(facture.sousTotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">TVA (20%)</span>
-                  <span className="text-foreground">{formatCurrency(facture.montantTva)}</span>
-                </div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Sous-total HT</span><span className="text-foreground">{formatCurrency(facture.sous_total)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">TVA</span><span className="text-foreground">{formatCurrency(facture.tva)}</span></div>
                 <Separator />
-                <div className="flex justify-between text-lg font-bold">
-                  <span className="text-foreground">Total TTC</span>
-                  <span className="text-primary">{formatCurrency(facture.totalTTC)}</span>
-                </div>
+                <div className="flex justify-between text-lg font-bold"><span className="text-foreground">Total TTC</span><span className="text-primary">{formatCurrency(facture.total_ttc)}</span></div>
               </div>
             </div>
+
           </CardContent>
         </Card>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Client Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Building2 className="h-4 w-4 text-primary" />
-                Client
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <button
-                onClick={() => navigate(`/clients/${client.id}`)}
-                className="text-lg font-semibold text-primary hover:underline"
-              >
-                {client.societe}
-              </button>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p>{client.adresse}</p>
-                <p>{client.codePostal} {client.ville}</p>
-                <p>{client.pays}</p>
-              </div>
-              <Separator />
-              <div>
-                <p className="text-sm text-muted-foreground">ICE</p>
-                <p className="font-mono text-sm text-foreground">{client.ice}</p>
-              </div>
-              <Separator />
-              <div className="text-sm space-y-1 text-foreground">
-                <p>{client.telephone}</p>
-                <p>{client.email}</p>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Devis d'origine */}
-          {devisOrigine && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <FileText className="h-4 w-4 text-primary" />
-                  Devis d'origine
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <button
-                  onClick={() => navigate(`/devis/${devisOrigine.id}`, { state: { from: location.pathname } })}
-                  className="w-full text-left p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                >
-                  <p className="font-mono font-medium text-foreground">{devisOrigine.numero}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {format(devisOrigine.dateCreation, 'dd MMM yyyy', { locale: fr })}
-                  </p>
-                </button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+
+                {/* Sidebar - Devis d'origine */}
+        
+                  <div className="space-y-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <FileText className="h-4 w-4 text-primary" />
+                          Devis d'origine
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <button
+                          onClick={() => navigate(`/clients/${clientId}/devis/${facture.devis.id}`)}
+                          className="w-full text-left p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                        >
+                          <p className="font-mono font-medium text-foreground">{facture.devis.numero_devis}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(facture.devis.created_at, 'dd MMM yyyy', { locale: fr })}
+                          </p>
+                        </button>
+                      </CardContent>
+                    </Card>
+                  </div>
       </div>
     </div>
   );
 };
 
-export default FactureDetail;
+export default FactureDetails;

@@ -68,7 +68,6 @@ const [isDialogOpen, setIsDialogOpen] = useState(false);
     nom_societe: '',
     adresse: '',
     ville: '',
-    codePostal: '',
     pays: 'Maroc',
     ice: '',
     telephone: '',
@@ -89,7 +88,6 @@ const [isDialogOpen, setIsDialogOpen] = useState(false);
         nom_societe: client.nom_societe,
         adresse: client.adresse,
         ville: client.ville,
-        codePostal: client.codePostal,
         pays: client.pays,
         ice: client.ice,
         telephone: client.telephone,
@@ -101,7 +99,6 @@ const [isDialogOpen, setIsDialogOpen] = useState(false);
         nom_societe: '',
         adresse: '',
         ville: '',
-        codePostal: '',
         pays: 'Maroc',
         ice: '',
         telephone: '',
@@ -114,24 +111,7 @@ const [isDialogOpen, setIsDialogOpen] = useState(false);
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
-  if (editingClient) {
-    // PUT vers Laravel
-    try {
-      const res = await axios.put<Client>(
-        `http://127.0.0.1:8000/api/clients/${editingClient.id}`,
-        formData
-      );
-      setClients(prev =>
-        prev.map(c => (c.id === editingClient.id ? res.data : c))
-      );
-      toast({
-        title: 'Client modifié',
-        description: `${res.data.nom_societe} a été mis à jour.`,
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  } else {
+ 
     // POST vers Laravel
     try {
       const res = await axios.post<Client>(
@@ -146,24 +126,24 @@ const handleSubmit = async (e: React.FormEvent) => {
     } catch (err) {
       console.error(err);
     }
-  }
+  
 
   setIsDialogOpen(false);
 };
 
   const handleDelete = async (client: Client) => {
-  try {
-    await axios.delete(`http://127.0.0.1:8000/api/clients/${client.id}`);
-    setClients(prev => prev.filter(c => c.id !== client.id));
-    toast({
-      title: 'Client supprimé',
-      description: `${client.nom_societe} a été supprimé.`,
-      variant: 'destructive',
-    });
-    navigate('/clients');
-  } catch (err) {
-    console.error(err);
-  }
+      try {
+        await axios.delete(`http://127.0.0.1:8000/api/clients/${client.id}`);
+        setClients(prev => prev.filter(c => c.id !== client.id));
+        toast({
+          title: 'Client supprimé',
+          description: `${client.nom_societe} a été supprimé.`,
+          variant: 'destructive',
+        });
+        navigate('/clients');
+      } catch (err) {
+        console.error(err);
+      }
 };
 
 
@@ -311,14 +291,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="codePostal">Code postal</Label>
-                <Input
-                  id="codePostal"
-                  value={formData.codePostal}
-                  onChange={(e) => setFormData({ ...formData, codePostal: e.target.value })}
-                />
-              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="pays">Pays</Label>
                 <Input

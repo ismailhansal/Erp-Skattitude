@@ -1,9 +1,8 @@
 export interface Client {
-  id: string;
+  id: number;
   nom_societe: string;
   adresse: string;
   ville: string;
-  codePostal?: string;
   pays: string;
   ice: string;
   telephone: string;

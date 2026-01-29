@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, MoreHorizontal, Eye, Edit, Trash2, Send, Printer } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { mockFactures, getClientById } from '@/data/mockData';
+import axios from 'axios';
 import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Facture, Client } from '@/types';
@@ -23,32 +23,62 @@ const FacturesPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
-  const [facturesList, setFacturesList] = useState(mockFactures);
+  const [factures, setFactures] = useState<Facture[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
   const today = new Date();
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-MA', {
-      style: 'currency',
-      currency: 'MAD',
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount);
 
-  const facturesWithClient = facturesList.map((f) => ({
+  useEffect(() => {
+    const fetchFactures = async () => {
+      try {
+        // Récupération de toutes les factures
+        const facturesRes = await axios.get<Facture[]>('http://127.0.0.1:8000/api/factures');
+        // Récupération de tous les clients
+        const clientsRes = await axios.get<Client[]>('http://127.0.0.1:8000/api/clients');
+
+        setFactures(
+          facturesRes.data.map(f => ({
+            ...f,
+            id: f.id.toString(),
+            totalTTC: Number(f.total_ttc),
+            estPayee: f.statut === 'payé',
+            dateFacturation: f.created_at ? new Date(f.created_at) : null,
+            dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
+          }))
+        );
+
+        setClients(clientsRes.data.map(c => ({ ...c, id: c.id.toString() })));
+        setLoading(false);
+      } catch (err) {
+        console.error(err);
+        setLoading(false);
+      }
+    };
+
+    fetchFactures();
+  }, []);
+
+  const getClientById = (id: number | string) => clients.find(c => c.id === String(id));
+
+  const facturesWithClient = factures.map(f => ({
     ...f,
-    client: getClientById(f.clientId)!,
+    client: getClientById(f.client_id)!,
   }));
 
   const filteredFactures = facturesWithClient.filter(
-    (facture) =>
-      facture.numero.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      facture.client.societe.toLowerCase().includes(searchQuery.toLowerCase())
+    f =>
+      f.numero_facture.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      f.client.nom_societe.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleDelete = (facture: Facture) => {
-    setFacturesList((prev) => prev.filter((f) => f.id !== facture.id));
+    setFactures(prev => prev.filter(f => f.id !== facture.id));
     toast({
       title: 'Facture supprimée',
-      description: `La facture ${facture.numero} a été supprimée.`,
+      description: `La facture ${facture.numero_facture} a été supprimée.`,
       variant: 'destructive',
     });
   };
@@ -65,7 +95,7 @@ const FacturesPage: React.FC = () => {
       key: 'numero',
       header: 'N° Facture',
       render: (item: Facture & { client: Client }) => (
-        <span className="font-mono font-medium text-foreground">{item.numero}</span>
+        <span className="font-mono font-medium text-foreground">{item.numero_facture}</span>
       ),
     },
     {
@@ -73,22 +103,20 @@ const FacturesPage: React.FC = () => {
       header: 'Client',
       render: (item: Facture & { client: Client }) => (
         <button
-          onClick={(e) => {
+          onClick={e => {
             e.stopPropagation();
-            navigate(`/clients/${item.clientId}`);
+            navigate(`/clients/${item.client_id}`);
           }}
           className="text-primary hover:underline font-medium"
         >
-          {item.client.societe}
+          {item.client.nom_societe}
         </button>
       ),
     },
     {
       key: 'totalTTC',
       header: 'Montant',
-      render: (item: Facture) => (
-        <span className="font-semibold">{formatCurrency(item.totalTTC)}</span>
-      ),
+      render: (item: Facture) => <span className="font-semibold">{formatCurrency(item.totalTTC)}</span>,
     },
     {
       key: 'dateFacturation',
@@ -122,7 +150,7 @@ const FacturesPage: React.FC = () => {
       render: (item: Facture & { client: Client }) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" onClick={e => e.stopPropagation()}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -158,12 +186,11 @@ const FacturesPage: React.FC = () => {
     },
   ];
 
+  if (loading) return <div className="flex justify-center items-center h-96">Chargement...</div>;
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader
-        title="Factures"
-        description="Gérez vos factures clients"
-      />
+      <PageHeader title="Factures" description="Gérez toutes les factures clients" />
 
       {/* Search */}
       <Card>
@@ -173,7 +200,7 @@ const FacturesPage: React.FC = () => {
             <Input
               placeholder="Rechercher par numéro ou client..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -184,7 +211,7 @@ const FacturesPage: React.FC = () => {
       <DataTable
         data={filteredFactures}
         columns={columns}
-        onRowClick={(item) => navigate(`/factures/${item.id}`)}
+        onRowClick={item => navigate(`/factures/${item.id}`)}
         emptyMessage="Aucune facture trouvée"
       />
     </div>

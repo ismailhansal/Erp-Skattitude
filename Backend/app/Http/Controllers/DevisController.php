@@ -60,43 +60,81 @@ public function factures($clientId, $devisId)
 
 
     // Créer un devis
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'description' => 'required|string',
-            'quantite' => 'required|numeric',
-            'nombre_jours' => 'required|numeric',
-            'prix_unitaire' => 'required|numeric',
-            'taxe' => 'nullable|numeric',
-            'condition_reglement' => 'required|string',
-            'date_evenement' => 'required|date',
-            'bon_de_commande' => 'nullable|boolean',
-       
-        ]);
+  public function store(Request $request, $clientId)
+{
+    // Vérifier que le client existe
+    $client = Client::findOrFail($clientId);
 
-        // Calcul des totaux
-        $sous_total = $validated['quantite'] * $validated['nombre_jours'] * $validated['prix_unitaire'];
-        $tva = isset($validated['taxe']) ? ($sous_total * $validated['taxe'] / 100) : 0;
-        $total_ttc = $sous_total + $tva;
+    // Validation
+    $validated = $request->validate([
+        'date_evenement' => 'required|date',
+        'condition_reglement' => 'required|string',
+        'bon_commande' => 'nullable|string',
+        'lignes' => 'required|array|min:1',
+        'lignes.*.description' => 'required|string',
+        'lignes.*.quantiteHotesses' => 'required|integer|min:1',
+        'lignes.*.nombreJours' => 'required|integer|min:1',
+        'lignes.*.prixUnitaire' => 'required|numeric|min:0',
+        'lignes.*.tva' => 'required|numeric|min:0',
+    ]);
 
-        // Numéro auto
-        $lastDevis = Devis::latest()->first();
-        $numero = $lastDevis ? 'DEV/2026/' . str_pad($lastDevis->id + 1, 4, '0', STR_PAD_LEFT) : 'DEV/2026/0001';
+    // Générer le numéro du devis
+    $year = date('Y');
+    $lastDevis = Devis::whereYear('created_at', $year)->latest()->first();
+    $nextNumber = $lastDevis ? ($lastDevis->id + 1) : 1;
+    $numero_devis = "DEV/{$year}/" . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
-        $devis = Devis::create(array_merge($validated, [
-            'numero_devis' => $numero,
-            'sous_total' => $sous_total,
-            'tva' => $tva,
-            'total_ttc' => $total_ttc,
+    // Commencer la transaction
+    \DB::beginTransaction();
+    try {
+        // Créer le devis
+        $devis = Devis::create([
+            'client_id' => $client->id,
+            'numero_devis' => $numero_devis,
+            'date_evenement' => $validated['date_evenement'],
+            'condition_reglement' => $validated['condition_reglement'],
+            'bon_commande' => $validated['bon_commande'] ?? null,
             'statut' => 'en_attente',
             'date_devis' => now(),
-        ]));
+        ]);
 
-      
+        $sous_total = 0;
+        $tva_total = 0;
 
-        return response()->json($devis->load('client'), 201);
+        // Créer les lignes
+        foreach ($validated['lignes'] as $ligne) {
+            $ligne_total = $ligne['quantiteHotesses'] * $ligne['nombreJours'] * $ligne['prixUnitaire'];
+            $ligne_tva = ($ligne_total * $ligne['tva']) / 100;
+            $sous_total += $ligne_total;
+            $tva_total += $ligne_tva;
+
+            $devis->lignes()->create([
+                'description' => $ligne['description'],
+                'quantiteHotesses' => $ligne['quantiteHotesses'],
+                'nombreJours' => $ligne['nombreJours'],
+                'prixUnitaire' => $ligne['prixUnitaire'],
+                'tva' => $ligne['tva'],
+            ]);
+        }
+
+        // Mettre à jour le total
+        $devis->update([
+            'sous_total' => $sous_total,
+            'tva' => $tva_total,
+            'total_ttc' => $sous_total + $tva_total,
+        ]);
+
+        \DB::commit();
+
+        return response()->json($devis->load('client', 'lignes'), 201);
+    } catch (\Exception $e) {
+        \DB::rollBack();
+        return response()->json([
+            'message' => 'Erreur lors de la création du devis',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 
 // Créer un devis - version simple
 

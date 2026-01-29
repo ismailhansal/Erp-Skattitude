@@ -43,3 +43,7 @@ Route::get('/clients/{client}/devis/{devis}/factures', [DevisController::class, 
 
 //R écupérer une facture précise pour un client précis
 Route::get('/clients/{client}/factures/{facture}', [FactureController::class, 'getFactureByClient']);
+
+
+// Créer un devis pour un client spécifique
+Route::post('/clients/{client}/devis', [DevisController::class, 'store']);
