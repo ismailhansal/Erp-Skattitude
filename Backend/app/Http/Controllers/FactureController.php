@@ -47,6 +47,67 @@ class FactureController extends Controller
 
 
 
+    public function storeFromDevis($clientId, $devisId)
+{
+    // 1️⃣ Vérifier que le devis existe et appartient bien au client
+    $devis = Devis::with('lignes')
+        ->where('id', $devisId)
+        ->where('client_id', $clientId)
+        ->firstOrFail();
+
+    \DB::beginTransaction();
+    try {
+        // 2️⃣ Générer le numéro de facture
+        $year = date('Y');
+        $lastFacture = Facture::whereYear('created_at', $year)->latest()->first();
+        $nextNumber = $lastFacture ? ($lastFacture->id + 1) : 1;
+        $numeroFacture = "FAC/{$year}/" . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+
+        // 3️⃣ Créer la facture
+        $facture = Facture::create([
+            'client_id' => $devis->client_id,
+            'devis_id' => $devis->id,
+            'numero_facture' => $numeroFacture,
+            'date_facture' => now(),
+            'date_echeance' => now()->addDays(30), // ou tu récupères la condition de règlement
+            'description' => $devis->description ?? null,
+            'sous_total' => $devis->sous_total,
+            'tva' => $devis->tva,
+            'total_ttc' => $devis->total_ttc,
+            'condition_reglement' => $devis->condition_reglement,
+            'statut' => 'en_attente',
+        ]);
+
+        // 4️⃣ Créer les lignes de facture depuis les lignes du devis
+        foreach ($devis->lignes as $ligne) {
+            $facture->lignes()->create([
+                'description' => $ligne->description,
+                'quantite' => $ligne->quantite,
+                'nombre_jours' => $ligne->nombre_jours,
+                'prix_unitaire' => $ligne->prix_unitaire,
+                'tva' => $ligne->tva,
+            ]);
+        }
+
+        // 5️⃣ Optionnel : marquer le devis comme "facturé"
+        $devis->update(['statut' => 'facturé']);
+
+        \DB::commit();
+
+        return response()->json($facture->load('client', 'lignes', 'devis'), 201);
+
+    } catch (\Exception $e) {
+        \DB::rollBack();
+        return response()->json([
+            'message' => 'Erreur lors de la création de la facture',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+
+
 
 
 

@@ -26,6 +26,12 @@ class Facture extends Model
         return $this->belongsTo(Devis::class);
     }
 
+    public function lignes()
+{
+    return $this->hasMany(FactureLigne::class);
+}
+
+
 
 
 
