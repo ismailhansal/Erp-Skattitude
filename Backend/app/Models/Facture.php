@@ -1,56 +1,66 @@
 <?php
 
 namespace App\Models;
-use Illuminate\Database\Eloquent\Factories\HasFactory; // ✅ correct
+
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Facture extends Model
 {
-    use HasFactory;
-
+    /**
+     * Les attributs qui peuvent être assignés en masse.
+     * 
+     * 🔥 IMPORTANT: NE PAS inclure 'description' ni 'prix_unitaire'
+     * Ces champs sont dans la table 'facture_lignes', pas 'factures'
+     */
     protected $fillable = [
-        'client_id', 'devis_id', 'numero_facture', 'date_facture', 'description',
-        'date_echeance', 'statut', 'tva', 'sous_total', 'prix_unitaire', 'total_ttc',
-        'condition_reglement', 'date_evenement'
+        'client_id',
+        'devis_id',
+        'numero_facture',
+        'date_facture',
+        'date_echeance',
+        'condition_reglement',
+        'sous_total',
+        'tva',
+        'total_ttc',
+        'statut',
+   
     ];
 
+    /**
+     * Les attributs qui doivent être castés.
+     */
     protected $casts = [
+        'date_facture' => 'date',
         'date_echeance' => 'date',
+        'date_evenement' => 'date',
+        'sous_total' => 'decimal:2',
+        'tva' => 'decimal:2',
+        'total_ttc' => 'decimal:2',
     ];
 
-    public function client() {
+    /**
+     * Relation avec le client
+     */
+    public function client(): BelongsTo
+    {
         return $this->belongsTo(Client::class);
     }
 
-    public function devis() {
+    /**
+     * Relation avec le devis (optionnel)
+     */
+    public function devis(): BelongsTo
+    {
         return $this->belongsTo(Devis::class);
     }
 
-    public function lignes()
-{
-    return $this->hasMany(FactureLigne::class);
-}
-
-
-
-
-
-    protected static function booted()
-{
-    static::creating(function ($facture) {
-        $year = now()->year;
-
-        $last = Facture::whereYear('created_at', $year)
-            ->orderBy('id', 'desc')
-            ->first();
-
-        $number = $last
-            ? intval(substr($last->numero_facture, -4)) + 1
-            : 1;
-
-        $facture->numero_facture = 'FAC/'.$year.'/'.str_pad($number, 4, '0', STR_PAD_LEFT);
-        $facture->statut = 'impayee';
-    });
-}
-
+    /**
+     * Relation avec les lignes de facture
+     */
+    public function lignes(): HasMany
+    {
+        return $this->hasMany(FactureLigne::class);
+    }
 }

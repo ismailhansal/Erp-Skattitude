@@ -25,11 +25,12 @@ import { useToast } from '@/hooks/use-toast';
 interface LigneFacture {
   id: number;
   description: string;
-  quantiteHotesses: number;
-  nombreJours: number;
-  prixUnitaire: number;
+  quantite: number;
+  nombre_jours: number;
+  prix_unitaire: number;
   tva: number;
 }
+
 
 interface Client {
   id: number;
@@ -57,25 +58,20 @@ interface Devis {
 interface Facture {
   id: number;
   numero_facture: string;
-  client_id: number;
-  devis_id?: number;
   date_facture: string;
   date_echeance: string;
-  description: string;
-  quantite: number;
-  nombre_jours: number;
-  prix_unitaire: string;
-  tva: string;
-  sous_total: string;
-  total_ttc: string;
   condition_reglement: string;
   statut: string;
+  sous_total: number;
+  tva: number;
+  total_ttc: number;
   created_at: string;
   updated_at: string;
   client: Client;
   devis?: Devis;
   lignes: LigneFacture[];
 }
+
 
 const ClientFactureDetail: React.FC = () => {
   const { clientId, factureId } = useParams<{ clientId: string; factureId: string }>();
@@ -112,6 +108,8 @@ const ClientFactureDetail: React.FC = () => {
         setLoading(true);
         const res = await axios.get<Facture>(`http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`);
         setFacture(res.data);
+        console.log('FACTURE:', res.data);
+        console.log('LIGNES:', res.data.lignes);
       } catch (err) {
         console.error(err);
         setError('Impossible de charger la facture.');
@@ -311,18 +309,49 @@ const ClientFactureDetail: React.FC = () => {
                     </tr>
                   </thead>
                  
- <tbody>
-  <tr className="border-t border-border">
-    <td className="p-3 text-foreground">{facture.description}</td>
-    <td className="p-3 text-center text-foreground">{facture.quantite}</td>
-    <td className="p-3 text-center text-foreground">{facture.nombre_jours}</td>
-    <td className="p-3 text-right text-foreground">{formatCurrency(facture.prix_unitaire)}</td>
-    <td className="p-3 text-right text-foreground">{facture.tva}%</td>
-    <td className="p-3 text-right font-medium text-foreground">
-      {formatCurrency(Number(facture.quantite) * Number(facture.nombre_jours) * Number(facture.prix_unitaire))}
-    </td>
-  </tr>
+<tbody>
+  {facture.lignes.length === 0 && (
+    <tr>
+      <td colSpan={6} className="p-4 text-center text-muted-foreground">
+        Aucune ligne de facture
+      </td>
+    </tr>
+  )}
+
+  {facture.lignes.map((ligne) => {
+    const totalHT =
+      ligne.quantite * ligne.nombre_jours * ligne.prix_unitaire;
+
+    return (
+      <tr key={ligne.id} className="border-t border-border">
+        <td className="p-3 text-foreground">
+          {ligne.description}
+        </td>
+
+        <td className="p-3 text-center text-foreground">
+          {ligne.quantite}
+        </td>
+
+        <td className="p-3 text-center text-foreground">
+          {ligne.nombre_jours}
+        </td>
+
+        <td className="p-3 text-right text-foreground">
+          {formatCurrency(ligne.prix_unitaire)}
+        </td>
+
+        <td className="p-3 text-right text-foreground">
+          {ligne.tva}%
+        </td>
+
+        <td className="p-3 text-right font-medium text-foreground">
+          {formatCurrency(totalHT)}
+        </td>
+      </tr>
+    );
+  })}
 </tbody>
+
 
 
                  

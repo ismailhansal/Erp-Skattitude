@@ -49,4 +49,4 @@ Route::get('/clients/{client}/factures/{facture}', [FactureController::class, 'g
 Route::post('/clients/{client}/devis', [DevisController::class, 'store']);
 
 // Créer une facture à partir d'un devis pour un client spécifique
-Route::post('clients/{clientId}/devis/{devisId}/facturer', [FactureController::class, 'storeFromDevis']);
+Route::post('clients/{clientId}/devis/{devisId}/factures', [FactureController::class, 'storeFromDevis']);

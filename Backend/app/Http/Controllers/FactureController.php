@@ -4,35 +4,49 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Facture;
+use App\Models\FactureLigne;
 use App\Models\Devis;
+use App\Models\Client;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class FactureController extends Controller
 {
-     // Liste toutes les factures
+    /**
+     * Liste toutes les factures
+     */
     public function index()
     {
-        return Facture::with('client', 'devis')->get();
+        return Facture::with('client', 'devis', 'lignes')->get();
     }
 
-    // Voir une facture
+    /**
+     * Voir une facture
+     */
     public function show($id)
     {
-        return Facture::with('client', 'devis')->findOrFail($id);
+        return Facture::with('client', 'devis', 'lignes')->findOrFail($id);
     }
 
-       public function getByClient($clientId)
-{
-    // Récupère toutes les factures pour ce client
-    $factures = Facture::where('client_id', $clientId)->get();
-    return response()->json($factures);
-}
-
-
-
- public function getFactureByClient($clientId, $factureId)
+    /**
+     * Récupérer toutes les factures d'un client
+     */
+    public function getByClient($clientId)
     {
-        // Cherche la facture qui correspond au client et à l'id
-        $facture = Facture::with('client', 'devis')
+        $factures = Facture::with('lignes')
+            ->where('client_id', $clientId)
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        return response()->json($factures);
+    }
+
+    /**
+     * Récupérer une facture spécifique d'un client
+     */
+    public function getFactureByClient($clientId, $factureId)
+    {
+        $facture = Facture::with('client', 'devis', 'lignes')
             ->where('id', $factureId)
             ->where('client_id', $clientId)
             ->first();
@@ -44,133 +58,315 @@ class FactureController extends Controller
         return response()->json($facture);
     }
 
-
-
-
-    public function storeFromDevis($clientId, $devisId)
-{
-    // 1️⃣ Vérifier que le devis existe et appartient bien au client
-    $devis = Devis::with('lignes')
-        ->where('id', $devisId)
-        ->where('client_id', $clientId)
-        ->firstOrFail();
-
-    \DB::beginTransaction();
-    try {
-        // 2️⃣ Générer le numéro de facture
-        $year = date('Y');
-        $lastFacture = Facture::whereYear('created_at', $year)->latest()->first();
-        $nextNumber = $lastFacture ? ($lastFacture->id + 1) : 1;
-        $numeroFacture = "FAC/{$year}/" . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-
-        // 3️⃣ Créer la facture
-        $facture = Facture::create([
-            'client_id' => $devis->client_id,
-            'devis_id' => $devis->id,
-            'numero_facture' => $numeroFacture,
-            'date_facture' => now(),
-            'date_echeance' => now()->addDays(30), // ou tu récupères la condition de règlement
-            'description' => $devis->description ?? null,
-            'sous_total' => $devis->sous_total,
-            'tva' => $devis->tva,
-            'total_ttc' => $devis->total_ttc,
-            'condition_reglement' => $devis->condition_reglement,
-            'statut' => 'en_attente',
-        ]);
-
-        // 4️⃣ Créer les lignes de facture depuis les lignes du devis
-        foreach ($devis->lignes as $ligne) {
-            $facture->lignes()->create([
-                'description' => $ligne->description,
-                'quantite' => $ligne->quantite,
-                'nombre_jours' => $ligne->nombre_jours,
-                'prix_unitaire' => $ligne->prix_unitaire,
-                'tva' => $ligne->tva,
+    /**
+     * 🔥 CRÉER UNE FACTURE DEPUIS UN DEVIS
+     * Route: POST /api/clients/{client}/devis/{devis}/facturer
+     */
+    public function storeFromDevis(Request $request, $clientId, $devisId)
+    {
+        try {
+            // 1. Validation des données
+            $validated = $request->validate([
+                'date_facture' => 'required|date',
+                'date_echeance' => 'nullable|date',
+                'condition_reglement' => 'required|string',
+                'lignes' => 'required|array|min:1',
+                'lignes.*.description' => 'required|string',
+                'lignes.*.quantite' => 'required|numeric|min:1',
+                'lignes.*.nombre_jours' => 'required|numeric|min:1',
+                'lignes.*.prix_unitaire' => 'required|numeric|min:0',
+                'lignes.*.tva' => 'required|numeric|min:0',
+                'sous_total' => 'required|numeric',
+                'total_ttc' => 'required|numeric',
             ]);
+
+            // 2. Vérifier que le devis existe et appartient au client
+            $devis = Devis::where('id', $devisId)
+                ->where('client_id', $clientId)
+                ->firstOrFail();
+
+            // 3. Vérifier que le devis n'est pas déjà facturé
+            if ($devis->statut === 'facturé') {
+                return response()->json([
+                    'message' => 'Ce devis est déjà facturé'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            try {
+                // 4. Générer le numéro de facture
+                $numeroFacture = $this->generateNumeroFacture();
+
+                // 5. Créer la facture (SANS description ni prix_unitaire)
+                $facture = Facture::create([
+                    'client_id' => $clientId,
+                    'devis_id' => $devisId,
+                    'numero_facture' => $numeroFacture,
+                    'date_facture' => $validated['date_facture'],
+                    'date_echeance' => $validated['date_echeance'] ?? null,
+                    'condition_reglement' => $validated['condition_reglement'],
+                    'sous_total' => $validated['sous_total'],
+                    'total_ttc' => $validated['total_ttc'],
+                    'statut' => 'impayee',
+                ]);
+
+                // 6. Créer les lignes de facture
+                foreach ($validated['lignes'] as $ligneData) {
+                    FactureLigne::create([
+                        'facture_id' => $facture->id,
+                        'description' => $ligneData['description'],
+                        'quantite' => $ligneData['quantite'],
+                        'nombre_jours' => $ligneData['nombre_jours'],
+                        'prix_unitaire' => $ligneData['prix_unitaire'],
+                        'tva' => $ligneData['tva'],
+                    ]);
+                }
+
+                // 7. Mettre à jour le statut du devis
+                $devis->update(['statut' => 'facturé']);
+
+                DB::commit();
+
+                // 8. Retourner la facture avec ses relations
+                return response()->json($facture->load('client', 'lignes', 'devis'), 201);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error('Erreur création facture depuis devis:', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                throw $e;
+            }
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Erreur de validation',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Erreur storeFromDevis:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'Erreur lors de la création de la facture',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // 5️⃣ Optionnel : marquer le devis comme "facturé"
-        $devis->update(['statut' => 'facturé']);
-
-        \DB::commit();
-
-        return response()->json($facture->load('client', 'lignes', 'devis'), 201);
-
-    } catch (\Exception $e) {
-        \DB::rollBack();
-        return response()->json([
-            'message' => 'Erreur lors de la création de la facture',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 
-
-
-
-
-
-
-
-    // Créer une facture directement
-    public function store(Request $request)
+    /**
+     * 🔥 CRÉER UNE FACTURE DIRECTE (sans devis)
+     * Route: POST /api/clients/{client}/factures
+     */
+    public function store(Request $request, $clientId)
     {
-        $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'devis_id' => 'nullable|exists:devis,id',
-            'description' => 'required|string',
-            'quantite' => 'required|numeric',
-            'nombre_jours' => 'required|numeric',
-            'prix_unitaire' => 'required|numeric',
-            'taxe' => 'nullable|numeric',
-            'condition_reglement' => 'required|string',
-            'date_echeance' => 'required|date',
-           
-        ]);
+        try {
+            $validated = $request->validate([
+                'date_facture' => 'required|date',
+                'date_echeance' => 'nullable|date',
+                'date_evenement' => 'required|date',
+                'condition_reglement' => 'required|string',
+                'lignes' => 'required|array|min:1',
+                'lignes.*.description' => 'required|string',
+                'lignes.*.quantite' => 'required|numeric|min:1',
+                'lignes.*.nombre_jours' => 'required|numeric|min:1',
+                'lignes.*.prix_unitaire' => 'required|numeric|min:0',
+                'lignes.*.tva' => 'required|numeric|min:0',
+                'sous_total' => 'required|numeric',
+                'tva' => 'required|numeric',
+                'total_ttc' => 'required|numeric',
+            ]);
 
-        // Calcul des totaux
-        $sous_total = $validated['quantite'] * $validated['nombre_jours'] * $validated['prix_unitaire'];
-        $tva = isset($validated['taxe']) ? ($sous_total * $validated['taxe'] / 100) : 0;
-        $total_ttc = $sous_total + $tva;
+            DB::beginTransaction();
 
-        // Numéro auto
-        $lastFacture = Facture::latest()->first();
-        $numero = $lastFacture ? 'FAC/2026/' . str_pad($lastFacture->id + 1, 4, '0', STR_PAD_LEFT) : 'FAC/2026/0001';
+            try {
+                $numeroFacture = $this->generateNumeroFacture();
 
-        $facture = Facture::create(array_merge($validated, [
-            'numero_facture' => $numero,
-            'sous_total' => $sous_total,
-            'tva' => $tva,
-            'date_facture' => now(),
-    'description' => $validated['description'], // accès correct
+                $facture = Facture::create([
+                    'client_id' => $clientId,
+                    'numero_facture' => $numeroFacture,
+                    'date_facture' => $validated['date_facture'],
+                    'date_echeance' => $validated['date_echeance'] ?? null,
+                    'date_evenement' => $validated['date_evenement'],
+                    'condition_reglement' => $validated['condition_reglement'],
+                    'sous_total' => $validated['sous_total'],
+                    'tva' => $validated['tva'],
+                    'total_ttc' => $validated['total_ttc'],
+                    'statut' => 'impayee',
+                ]);
 
-            'total_ttc' => $total_ttc,
-            'statut' => 'impayé',
-        ]));
+                foreach ($validated['lignes'] as $ligneData) {
+                    FactureLigne::create([
+                        'facture_id' => $facture->id,
+                        'description' => $ligneData['description'],
+                        'quantite' => $ligneData['quantite'],
+                        'nombre_jours' => $ligneData['nombre_jours'],
+                        'prix_unitaire' => $ligneData['prix_unitaire'],
+                        'tva' => $ligneData['tva'],
+                    ]);
+                }
 
-        // Si création depuis un devis, mettre à jour statut devis
-        if ($request->devis_id) {
-            $devis = Devis::find($request->devis_id);
-            $devis->statut = 'facturé';
-            $devis->save();
+                DB::commit();
+
+                return response()->json($facture->load('client', 'lignes'), 201);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Erreur store facture:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'Erreur lors de la création de la facture',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        return response()->json($facture->load('client', 'devis'), 201);
     }
 
-    // Modifier facture
-    public function update(Request $request, $id)
+    /**
+     * 🔥 MODIFIER UNE FACTURE
+     * Route: PUT /api/clients/{client}/factures/{facture}
+     */
+    public function update(Request $request, $clientId, $factureId)
     {
-        $facture = Facture::findOrFail($id);
-        $facture->update($request->all());
-        return response()->json($facture);
+        try {
+            $facture = Facture::where('id', $factureId)
+                ->where('client_id', $clientId)
+                ->firstOrFail();
+
+            $validated = $request->validate([
+                'date_facture' => 'required|date',
+                'date_echeance' => 'nullable|date',
+                'date_evenement' => 'required|date',
+                'condition_reglement' => 'required|string',
+                'lignes' => 'required|array|min:1',
+                'lignes.*.description' => 'required|string',
+                'lignes.*.quantite' => 'required|numeric|min:1',
+                'lignes.*.nombre_jours' => 'required|numeric|min:1',
+                'lignes.*.prix_unitaire' => 'required|numeric|min:0',
+                'lignes.*.tva' => 'required|numeric|min:0',
+                'sous_total' => 'required|numeric',
+                'tva' => 'required|numeric',
+                'total_ttc' => 'required|numeric',
+            ]);
+
+            DB::beginTransaction();
+
+            try {
+                // Mettre à jour la facture
+                $facture->update([
+                    'date_facture' => $validated['date_facture'],
+                    'date_echeance' => $validated['date_echeance'] ?? null,
+                    'date_evenement' => $validated['date_evenement'],
+                    'condition_reglement' => $validated['condition_reglement'],
+                    'sous_total' => $validated['sous_total'],
+                    'tva' => $validated['tva'],
+                    'total_ttc' => $validated['total_ttc'],
+                ]);
+
+                // Supprimer les anciennes lignes
+                $facture->lignes()->delete();
+
+                // Créer les nouvelles lignes
+                foreach ($validated['lignes'] as $ligneData) {
+                    FactureLigne::create([
+                        'facture_id' => $facture->id,
+                        'description' => $ligneData['description'],
+                        'quantite' => $ligneData['quantite'],
+                        'nombre_jours' => $ligneData['nombre_jours'],
+                        'prix_unitaire' => $ligneData['prix_unitaire'],
+                        'tva' => $ligneData['tva'],
+                    ]);
+                }
+
+                DB::commit();
+
+                return response()->json($facture->load('client', 'lignes'));
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Erreur update facture:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'Erreur lors de la modification de la facture',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
-    // Supprimer facture
-    public function destroy($id)
+    /**
+     * Supprimer une facture
+     */
+    public function destroy($clientId, $factureId)
     {
-        $facture = Facture::findOrFail($id);
-        $facture->delete();
-        return response()->json(['message' => 'Facture supprimée']);
+        try {
+            $facture = Facture::where('id', $factureId)
+                ->where('client_id', $clientId)
+                ->firstOrFail();
+
+            DB::beginTransaction();
+
+            try {
+                // Si la facture provient d'un devis, remettre le devis en attente
+                if ($facture->devis_id) {
+                    $devis = Devis::find($facture->devis_id);
+                    if ($devis) {
+                        $devis->update(['statut' => 'en_attente']);
+                    }
+                }
+
+                // Supprimer la facture (les lignes seront supprimées en cascade)
+                $facture->delete();
+
+                DB::commit();
+
+                return response()->json(['message' => 'Facture supprimée avec succès']);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Erreur destroy facture:', [
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'message' => 'Erreur lors de la suppression',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Générer un numéro de facture unique
+     */
+    private function generateNumeroFacture(): string
+    {
+        $year = date('Y');
+        $lastFacture = Facture::whereYear('created_at', $year)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $number = $lastFacture ? intval(substr($lastFacture->numero_facture, -4)) + 1 : 1;
+        
+        return sprintf('FAC/%s/%04d', $year, $number);
     }
 }
