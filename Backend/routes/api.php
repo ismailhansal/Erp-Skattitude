@@ -50,3 +50,10 @@ Route::post('/clients/{client}/devis', [DevisController::class, 'store']);
 
 // Créer une facture à partir d'un devis pour un client spécifique
 Route::post('clients/{clientId}/devis/{devisId}/factures', [FactureController::class, 'storeFromDevis']);
+
+// Mettre à jour un devis pour un client spécifique
+Route::put('/clients/{client}/devis', [DevisController::class, 'update']);
+
+
+//R écupérer une facture précise pour un client précis
+Route::put('/clients/{client}/factures/{facture}', [FactureController::class, 'update']);

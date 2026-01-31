@@ -144,12 +144,40 @@ public function factures($clientId, $devisId)
 // Créer un devis - version simple
 
     // Modifier un devis
-    public function update(Request $request, $id)
-    {
-        $devis = Devis::findOrFail($id);
-        $devis->update($request->all());
-        return response()->json($devis);
+   public function update(Request $request, $id)
+{
+    $devis = Devis::findOrFail($id);
+
+    // 1️⃣ Update devis
+    $devis->update([
+        'date_evenement' => $request->date_evenement,
+        'condition_reglement' => $request->condition_reglement,
+        'bon_commande' => $request->bon_commande,
+        'sous_total' => $request->sous_total,
+        'tva' => $request->tva,
+        'total_ttc' => $request->total_ttc,
+    ]);
+
+    // 2️⃣ Update lignes
+    if ($request->has('lignes')) {
+        // Supprime les anciennes lignes
+        $devis->lignes()->delete();
+
+        // Crée les nouvelles
+        foreach ($request->lignes as $l) {
+            $devis->lignes()->create([
+                'description' => $l['description'],
+                'quantite' => $l['quantite'],
+                'nombre_jours' => $l['nombre_jours'],
+                'prix_unitaire' => $l['prix_unitaire'],
+                'tva' => $l['tva'],
+            ]);
+        }
     }
+
+    return response()->json($devis->load('lignes'));
+}
+
 
     // Supprimer un devis
     public function destroy($id)

@@ -13,7 +13,7 @@ import { LigneDocument } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 const ClientDevisForm: React.FC = () => {
-  const { clientId, devisId } = useParams<{ clientId: string; devisId: string }>();
+  const { clientId, devisId } = useParams<{ clientId: string; devisId?: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -25,75 +25,82 @@ const ClientDevisForm: React.FC = () => {
   const [dateEvenement, setDateEvenement] = useState('');
   const [conditionReglement, setConditionReglement] = useState('30 jours fin de mois');
   const [bonCommande, setBonCommande] = useState('');
+
   const [lignes, setLignes] = useState<Omit<LigneDocument, 'id'>[]>([
-    {
-      description: '',
-      quantiteHotesses: 1,
-      nombreJours: 1,
-      prixUnitaire: 0,
-      tva: 20,
-    },
+    { description: '', quantiteHotesses: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 },
   ]);
 
-  // Fetch client depuis l'API
+  /* ================= CLIENT ================= */
   useEffect(() => {
-    const fetchClient = async () => {
-      try {
-        const res = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}`);
-        if (!res.ok) throw new Error('Client non trouvé');
-        const data = await res.json();
-        setClient(data);
-      } catch (err) {
-        console.error(err);
+    fetch(`http://127.0.0.1:8000/api/clients/${clientId}`)
+      .then(res => res.json())
+      .then(setClient)
+      .catch(() =>
         toast({
           title: 'Erreur',
-          description: 'Impossible de récupérer le client.',
+          description: 'Impossible de récupérer le client',
           variant: 'destructive',
-        });
-      }
-    };
-
-    fetchClient();
+        })
+      );
   }, [clientId, toast]);
 
-  // Totaux
+  /* ================= DEVIS (EDIT) ================= */
+  useEffect(() => {
+    if (!isEdit) return;
+
+    fetch(`http://127.0.0.1:8000/api/devis/${devisId}`)
+      .then(res => res.json())
+      .then(data => {
+        setDateEvenement(data.date_evenement);
+        setConditionReglement(data.condition_reglement);
+        setBonCommande(data.bon_commande || '');
+      setLignes(
+  data.lignes.map((l: any) => ({
+    description: l.description,
+    quantiteHotesses: l.quantite,
+    nombreJours: l.nombre_jours,
+    prixUnitaire: parseFloat(l.prix_unitaire),
+    tva: parseFloat(l.tva), // <-- conversion en nombre
+  }))
+);
+
+      })
+      .catch(() =>
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de récupérer le devis',
+          variant: 'destructive',
+        })
+      );
+  }, [isEdit, devisId, toast]);
+
+  /* ================= TOTAUX ================= */
   const calculateTotals = () => {
     let sousTotal = 0;
     let montantTva = 0;
 
-    lignes.forEach((ligne) => {
-      const ligneTotal = ligne.quantiteHotesses * ligne.nombreJours * ligne.prixUnitaire;
-      sousTotal += ligneTotal;
-      montantTva += (ligneTotal * ligne.tva) / 100;
+    lignes.forEach(l => {
+      const total = l.quantiteHotesses * l.nombreJours * l.prixUnitaire;
+      sousTotal += total;
+      montantTva += (total * l.tva) / 100;
     });
 
-    return {
-      sousTotal,
-      montantTva,
-      totalTTC: sousTotal + montantTva,
-    };
+    return { sousTotal, montantTva, totalTTC: sousTotal + montantTva };
   };
 
   const { sousTotal, montantTva, totalTTC } = calculateTotals();
 
-  // Gestion des lignes
-  const addLigne = () => {
-    setLignes([
-      ...lignes,
-      { description: '', quantiteHotesses: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 },
-    ]);
-  };
+  /* ================= LIGNES ================= */
+  const addLigne = () =>
+    setLignes([...lignes, { description: '', quantiteHotesses: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }]);
 
-  const removeLigne = (index: number) => {
-    if (lignes.length > 1) {
-      setLignes(lignes.filter((_, i) => i !== index));
-    }
-  };
+  const removeLigne = (index: number) =>
+    lignes.length > 1 && setLignes(lignes.filter((_, i) => i !== index));
 
-  const updateLigne = (index: number, field: keyof Omit<LigneDocument, 'id'>, value: string | number) => {
-    const newLignes = [...lignes];
-    newLignes[index] = { ...newLignes[index], [field]: value };
-    setLignes(newLignes);
+  const updateLigne = (index: number, field: any, value: any) => {
+    const updated = [...lignes];
+    updated[index] = { ...updated[index], [field]: value };
+    setLignes(updated);
   };
 
   const formatCurrency = (amount: number) =>
@@ -101,25 +108,13 @@ const ClientDevisForm: React.FC = () => {
 
   const getBackPath = () => `/clients/${clientId}/vente`;
 
-  // Submit
+  /* ================= SUBMIT ================= */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!dateEvenement) {
-      toast({ title: 'Erreur', description: 'Veuillez saisir la date de l\'événement.', variant: 'destructive' });
-      return;
-    }
-
-    const invalidLigne = lignes.find(l => !l.description || l.prixUnitaire <= 0);
-    if (invalidLigne) {
-      toast({ title: 'Erreur', description: 'Veuillez remplir correctement toutes les lignes.', variant: 'destructive' });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      const devisData = {
+      const payload = {
         client_id: clientId,
         date_evenement: dateEvenement,
         condition_reglement: conditionReglement,
@@ -136,48 +131,39 @@ const ClientDevisForm: React.FC = () => {
         total_ttc: totalTTC,
       };
 
-      const response = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}/devis`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(devisData),
+      const url = isEdit
+        ? `http://127.0.0.1:8000/api/devis/${devisId}`
+        : `http://127.0.0.1:8000/api/clients/${clientId}/devis`;
+
+      await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Erreur lors de la création du devis');
-      }
-
-      const newDevis = await response.json();
-
       toast({
-        title: 'Devis créé',
-        description: `Le devis ${newDevis.numero_devis} a été créé avec succès.`,
+        title: isEdit ? 'Devis modifié' : 'Devis créé',
+        description: 'Opération réussie',
       });
 
       navigate(getBackPath());
-    } catch (error) {
-      console.error('Erreur lors de la création du devis:', error);
-      toast({
-        title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Une erreur est survenue lors de la création du devis.',
-        variant: 'destructive',
-      });
+    } catch {
+      toast({ title: 'Erreur', description: 'Erreur lors de la sauvegarde', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!client) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">Client non trouvé</p>
-      </div>
-    );
-  }
+  if (!client) return null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <PageHeader title='Nouveau devis' description={`Client: ${client.nom_societe}`} showBack backPath={getBackPath()} />
+    <div className="space-y-6">
+      <PageHeader
+        title={isEdit ? 'Modifier le devis' : 'Nouveau devis'}
+        description={`Client: ${client.nom_societe}`}
+        showBack
+        backPath={getBackPath()}
+      />
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -59,40 +59,26 @@ interface Facture {
   }>;
 }
 
-// Fonction utilitaire pour valider et formater les dates
-const formatDateForInput = (dateString: string | null | undefined): string => {
+// Utilitaires
+const formatDateForInput = (dateString?: string | null): string => {
   if (!dateString) return '';
-  
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return '';
-    return date.toISOString().split('T')[0];
-  } catch {
-    return '';
-  }
+  const date = new Date(dateString);
+  return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
 };
 
-const getTodayDate = (): string => {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
-};
+const getTodayDate = (): string => new Date().toISOString().split('T')[0];
 
 const ClientFactureForm: React.FC = () => {
-  const { clientId, devisId, factureId } = useParams<{ 
-    clientId: string; 
-    devisId?: string;
-    factureId?: string;
-  }>();
+  const { clientId, devisId, factureId } = useParams<{ clientId: string; devisId?: string; factureId?: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Déterminer le mode d'utilisation
   const isEditFacture = !!factureId;
   const isCreateFromDevis = !!devisId && !factureId;
-  const isCreateDirect = !devisId && !factureId;
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
   const [client, setClient] = useState<Client | null>(null);
   const [sourceDevis, setSourceDevis] = useState<Devis | null>(null);
 
@@ -101,67 +87,47 @@ const ClientFactureForm: React.FC = () => {
   const [dateEcheance, setDateEcheance] = useState('');
   const [conditionReglement, setConditionReglement] = useState('30 jours fin de mois');
   const [lignes, setLignes] = useState<LigneDocument[]>([
-    {
-      description: '',
-      quantite: 1,
-      nombreJours: 1,
-      prixUnitaire: 0,
-      tva: 20,
-    },
+    { description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }
   ]);
 
-  // Calculer date d'échéance automatiquement
+  // Calcul date d'échéance
   useEffect(() => {
     if (!dateFacture) return;
+    const date = new Date(dateFacture);
+    if (isNaN(date.getTime())) return;
 
-    try {
-      const date = new Date(dateFacture);
-      if (isNaN(date.getTime())) return;
+    let joursAjout = 0;
 
-      let joursAjout = 0;
-
-      switch (conditionReglement) {
-        case 'À réception':
-          joursAjout = 0;
-          break;
-        case '15 jours':
-          joursAjout = 15;
-          break;
-        case '30 jours':
-          joursAjout = 30;
-          break;
-        case '30 jours fin de mois':
-          date.setMonth(date.getMonth() + 1);
-          date.setDate(0);
-          setDateEcheance(date.toISOString().split('T')[0]);
-          return;
-        case '60 jours':
-          joursAjout = 60;
-          break;
-      }
-
-      date.setDate(date.getDate() + joursAjout);
-      setDateEcheance(date.toISOString().split('T')[0]);
-
-    } catch (error) {
-      console.error('Erreur calcul échéance:', error);
+    switch (conditionReglement) {
+      case 'À réception': joursAjout = 0; break;
+      case '15 jours': joursAjout = 15; break;
+      case '30 jours': joursAjout = 30; break;
+      case '60 jours': joursAjout = 60; break;
+      case '30 jours fin de mois':
+        date.setMonth(date.getMonth() + 1);
+        date.setDate(0);
+        setDateEcheance(date.toISOString().split('T')[0]);
+        return;
     }
+
+    date.setDate(date.getDate() + joursAjout);
+    setDateEcheance(date.toISOString().split('T')[0]);
   }, [dateFacture, conditionReglement]);
 
-  // Chargement des données
+  // Chargement données client / devis / facture
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       try {
+        // Client
         const clientRes = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}`);
         if (!clientRes.ok) throw new Error('Client non trouvé');
-        const clientData = await clientRes.json();
+        const clientData: Client = await clientRes.json();
         setClient(clientData);
 
         if (isEditFacture && factureId) {
-          const factureRes = await fetch(
-            `http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`
-          );
+          // Facture
+          const factureRes = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`);
           if (!factureRes.ok) throw new Error('Facture non trouvée');
           const factureData: Facture = await factureRes.json();
 
@@ -169,306 +135,144 @@ const ClientFactureForm: React.FC = () => {
           setDateEcheance(formatDateForInput(factureData.date_echeance));
           setConditionReglement(factureData.condition_reglement || '30 jours fin de mois');
 
-          if (factureData.lignes && Array.isArray(factureData.lignes) && factureData.lignes.length > 0) {
-            const lignesConverties: LigneDocument[] = factureData.lignes.map(ligne => ({
-              id: ligne.id,
-              description: String(ligne.description || ''),
-              quantite: Number(ligne.quantite) || 1,
-              nombreJours: Number(ligne.nombre_jours) || 1,
-              prixUnitaire: Number(ligne.prix_unitaire) || 0,
-              tva: Number(ligne.tva) || 20,
-            }));
-            setLignes(lignesConverties);
-          } else {
-            setLignes([
-              { description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }
-            ]);
-          }
+          const lignesFacture = factureData.lignes.length
+            ? factureData.lignes.map(l => ({
+                id: l.id,
+                description: String(l.description || ''),
+                quantite: Number(l.quantite || 1),
+                nombreJours: Number(l.nombre_jours || 1),
+                prixUnitaire: Number(l.prix_unitaire || 0),
+                tva: Number(l.tva || 20),
+
+              }))
+            : [{ description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }];
+          
+          setLignes(lignesFacture);
 
         } else if (isCreateFromDevis && devisId) {
-          const devisRes = await fetch(
-            `http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}`
-          );
+          // Devis
+          const devisRes = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}`);
           if (!devisRes.ok) throw new Error('Devis non trouvé');
           const devisData: Devis = await devisRes.json();
-          setSourceDevis(devisData);
 
+          setSourceDevis(devisData);
           setConditionReglement(devisData.condition_reglement || '30 jours fin de mois');
 
-          if (devisData.lignes && Array.isArray(devisData.lignes) && devisData.lignes.length > 0) {
-            const lignesConverties: LigneDocument[] = devisData.lignes.map(ligne => ({
-              description: String(ligne.description || ''),
-              quantite: Number(ligne.quantite) || 1,
-              nombreJours: Number(ligne.nombre_jours) || 1,
-              prixUnitaire: Number(ligne.prix_unitaire) || 0,
-              tva: Number(ligne.tva) || 20,
-            }));
-            setLignes(lignesConverties);
-          } else {
-            setLignes([
-              { description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }
-            ]);
-          }
+          const lignesDevis = devisData.lignes.length
+            ? devisData.lignes.map(l => ({
+                description: String(l.description || ''),
+                quantite: Number(l.quantite || 1),
+                nombreJours: Number(l.nombre_jours || 1),
+                prixUnitaire: Number(l.prix_unitaire || 0),
+                tva: Number(l.tva || 20),
+              }))
+            : [{ description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }];
+          
+          setLignes(lignesDevis);
         }
 
       } catch (error) {
-        console.error('Erreur chargement:', error);
-        toast({
-          title: 'Erreur',
-          description: error instanceof Error ? error.message : 'Erreur de chargement',
-          variant: 'destructive',
-        });
+        toast({ title: 'Erreur', description: error instanceof Error ? error.message : 'Erreur de chargement', variant: 'destructive' });
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (clientId) {
-      loadData();
-    }
-  }, [clientId, devisId, factureId, isEditFacture, isCreateFromDevis, toast]);
+    if (clientId) loadData();
+  }, [clientId, devisId, factureId]);
 
-  // Calcul des totaux
+  // Calcul totaux
   const calculateTotals = () => {
     let sousTotal = 0;
     let montantTva = 0;
-
-    lignes.forEach((ligne) => {
-      const qte = Number(ligne?.quantite) || 0;
-      const jours = Number(ligne?.nombreJours) || 0;
-      const prix = Number(ligne?.prixUnitaire) || 0;
-      const tva = Number(ligne?.tva) || 0;
-
-      const ligneTotal = qte * jours * prix;
+    lignes.forEach(l => {
+      const ligneTotal = (l.quantite || 0) * (l.nombreJours || 0) * (l.prixUnitaire || 0);
       sousTotal += ligneTotal;
-      montantTva += (ligneTotal * tva) / 100;
+      montantTva += (ligneTotal * (l.tva || 0)) / 100;
     });
-
-    return {
-      sousTotal: isNaN(sousTotal) ? 0 : sousTotal,
-      montantTva: isNaN(montantTva) ? 0 : montantTva,
-      totalTTC: isNaN(sousTotal + montantTva) ? 0 : sousTotal + montantTva,
-    };
+    return { sousTotal, montantTva, totalTTC: sousTotal + montantTva };
   };
-
   const { sousTotal, montantTva, totalTTC } = calculateTotals();
 
-  // Gestion des lignes
-  const addLigne = () => {
-    setLignes([
-      ...lignes,
-      { description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 },
-    ]);
-  };
-
-  const removeLigne = (index: number) => {
-    if (lignes.length > 1) {
-      setLignes(lignes.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateLigne = (
-    index: number, 
-    field: keyof LigneDocument, 
-    value: string | number
-  ) => {
+  // Gestion lignes
+  const addLigne = () => setLignes([...lignes, { description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }]);
+  const removeLigne = (index: number) => lignes.length > 1 && setLignes(lignes.filter((_, i) => i !== index));
+  const updateLigne = (index: number, field: keyof LigneDocument, value: string | number) => {
     const newLignes = [...lignes];
-    if (newLignes[index]) {
-      newLignes[index] = { ...newLignes[index], [field]: value };
-      setLignes(newLignes);
-    }
+    newLignes[index] = { ...newLignes[index], [field]: value };
+    setLignes(newLignes);
   };
 
-  const formatCurrency = (amount: number) => {
-    const safeAmount = Number(amount) || 0;
-    return new Intl.NumberFormat('fr-MA', { 
-      style: 'currency', 
-      currency: 'MAD' 
-    }).format(safeAmount);
-  };
+  const formatCurrency = (amount: number) => new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount || 0);
 
-  const getBackPath = () => {
-    if (isEditFacture) {
-      return `/clients/${clientId}/factures/${factureId}`;
-    }
-    if (isCreateFromDevis) {
-      return `/clients/${clientId}/devis/${devisId}`;
-    }
-    return `/clients/${clientId}/vente`;
-  };
+  const getBackPath = () => isEditFacture ? `/clients/${clientId}/factures/${factureId}` :
+    isCreateFromDevis ? `/clients/${clientId}/devis/${devisId}` : `/clients/${clientId}/vente`;
 
-  // 🔥 CORRECTION ICI - Format exact comme Postman
+  // Soumission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!dateFacture) return toast({ title: 'Erreur', description: 'Veuillez saisir la date de facture.', variant: 'destructive' });
 
-    if (!dateFacture) {
-      toast({ 
-        title: 'Erreur', 
-        description: 'Veuillez saisir la date de facture.', 
-        variant: 'destructive' 
-      });
-      return;
-    }
-
-   
-
-    const invalidLigne = lignes.find(l => {
-      const desc = String(l?.description || '').trim();
-      const prix = Number(l?.prixUnitaire) || 0;
-      return !desc || prix <= 0;
-    });
-
-    if (invalidLigne) {
-      toast({ 
-        title: 'Erreur', 
-        description: 'Chaque ligne doit avoir une description et un prix supérieur à 0.', 
-        variant: 'destructive' 
-      });
-      return;
-    }
+    const invalidLigne = lignes.find(l => !l.description.trim() || l.prixUnitaire <= 0);
+    if (invalidLigne) return toast({ title: 'Erreur', description: 'Chaque ligne doit avoir une description et un prix > 0.', variant: 'destructive' });
 
     setIsSaving(true);
-
     try {
-      // 🔥 FORMAT EXACT COMME POSTMAN
       const factureData = {
         date_facture: dateFacture,
         date_echeance: dateEcheance || null,
         condition_reglement: conditionReglement,
         lignes: lignes.map(l => ({
-          description: String(l.description || '').trim(),
-          quantite: Number(l.quantite) || 1,
-          nombre_jours: Number(l.nombreJours) || 1,
-          prix_unitaire: Number(l.prixUnitaire) || 0,
-          tva: Number(l.tva) || 0,
-        })),
+          description: l.description.trim(),
+          quantite: l.quantite,
+          nombre_jours: l.nombreJours,
+          prix_unitaire: l.prixUnitaire,
+          tva: l.tva,})),
         sous_total: Number(sousTotal.toFixed(2)),
         total_ttc: Number(totalTTC.toFixed(2)),
       };
 
-      console.log('📤 Données envoyées:', JSON.stringify(factureData, null, 2));
-
-      let response;
+      let response: Response;
       let successMessage = '';
 
       if (isEditFacture && factureId) {
-        response = await fetch(
-          `http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`,
-          {
-            method: 'PUT',
-            headers: { 
-              'Content-Type': 'application/json', 
-              'Accept': 'application/json' 
-            },
-            body: JSON.stringify(factureData),
-          }
-        );
+        response = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(factureData) });
         successMessage = 'Facture modifiée avec succès';
-
       } else if (isCreateFromDevis && devisId) {
-        console.log('🔥 Création depuis devis:', devisId);
-        
-        response = await fetch(
-          `http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}/factures`,
-          {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json', 
-              'Accept': 'application/json' 
-            },
-            body: JSON.stringify(factureData),
-          }
-        );
+        response = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}/factures`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(factureData) });
         successMessage = 'Facture créée depuis le devis';
-
       } else {
-        response = await fetch(
-          `http://127.0.0.1:8000/api/clients/${clientId}/factures`,
-          {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json', 
-              'Accept': 'application/json' 
-            },
-            body: JSON.stringify(factureData),
-          }
-        );
+        response = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}/factures`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(factureData) });
         successMessage = 'Facture créée avec succès';
       }
 
-      console.log('📥 Statut réponse:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Erreur serveur:', errorText);
-        
         let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { message: errorText };
-        }
-        
-        throw new Error(errorData.message || 'Erreur lors de l\'opération');
+        try { errorData = JSON.parse(errorText); } catch { errorData = { message: errorText }; }
+        throw new Error(errorData.message || 'Erreur serveur');
       }
 
       const result = await response.json();
-      console.log('✅ Succès:', result);
-
-      toast({
-        title: 'Succès',
-        description: `${successMessage}. N° ${result.numero_facture || ''}`,
-      });
-
-      if (isEditFacture) {
-        navigate(`/clients/${clientId}/factures/${factureId}`);
-      } else {
-        navigate(`/clients/${clientId}/vente`);
-      }
+      toast({ title: 'Succès', description: `${successMessage}. N° ${result.numero_facture || ''}` });
+      navigate(isEditFacture ? `/clients/${clientId}/factures/${factureId}` : `/clients/${clientId}/vente`);
 
     } catch (error) {
-      console.error('❌ Erreur complète:', error);
-      toast({
-        title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Une erreur est survenue',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erreur', description: error instanceof Error ? error.message : 'Une erreur est survenue', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">Chargement...</p>
-      </div>
-    );
-  }
+  if (isLoading) return <div className="flex items-center justify-center h-96"><p className="text-muted-foreground">Chargement...</p></div>;
+  if (!client) return <div className="flex items-center justify-center h-96"><p className="text-muted-foreground">Client non trouvé</p></div>;
 
-  if (!client) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">Client non trouvé</p>
-      </div>
-    );
-  }
-
-  const getTitle = () => {
-    if (isEditFacture) return 'Modifier la facture';
-    if (isCreateFromDevis) return `Créer une facture depuis le devis ${sourceDevis?.numero_devis || ''}`;
-    return 'Nouvelle facture';
-  };
+  const getTitle = () => isEditFacture ? 'Modifier la facture' :
+    isCreateFromDevis ? `Créer une facture depuis le devis ${sourceDevis?.numero_devis || ''}` : 'Nouvelle facture';
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader 
-        title={getTitle()} 
-        description={`Client: ${client.nom_societe}`} 
-        showBack 
-        backPath={getBackPath()} 
-      />
-
+      <PageHeader title={getTitle()} description={`Client: ${client.nom_societe}`} showBack backPath={getBackPath()} />
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">

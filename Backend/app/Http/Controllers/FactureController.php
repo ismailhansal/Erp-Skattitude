@@ -168,7 +168,6 @@ class FactureController extends Controller
             $validated = $request->validate([
                 'date_facture' => 'required|date',
                 'date_echeance' => 'nullable|date',
-                'date_evenement' => 'required|date',
                 'condition_reglement' => 'required|string',
                 'lignes' => 'required|array|min:1',
                 'lignes.*.description' => 'required|string',
@@ -191,7 +190,6 @@ class FactureController extends Controller
                     'numero_facture' => $numeroFacture,
                     'date_facture' => $validated['date_facture'],
                     'date_echeance' => $validated['date_echeance'] ?? null,
-                    'date_evenement' => $validated['date_evenement'],
                     'condition_reglement' => $validated['condition_reglement'],
                     'sous_total' => $validated['sous_total'],
                     'tva' => $validated['tva'],
@@ -246,7 +244,6 @@ class FactureController extends Controller
             $validated = $request->validate([
                 'date_facture' => 'required|date',
                 'date_echeance' => 'nullable|date',
-                'date_evenement' => 'required|date',
                 'condition_reglement' => 'required|string',
                 'lignes' => 'required|array|min:1',
                 'lignes.*.description' => 'required|string',
@@ -255,7 +252,6 @@ class FactureController extends Controller
                 'lignes.*.prix_unitaire' => 'required|numeric|min:0',
                 'lignes.*.tva' => 'required|numeric|min:0',
                 'sous_total' => 'required|numeric',
-                'tva' => 'required|numeric',
                 'total_ttc' => 'required|numeric',
             ]);
 
@@ -266,10 +262,8 @@ class FactureController extends Controller
                 $facture->update([
                     'date_facture' => $validated['date_facture'],
                     'date_echeance' => $validated['date_echeance'] ?? null,
-                    'date_evenement' => $validated['date_evenement'],
                     'condition_reglement' => $validated['condition_reglement'],
                     'sous_total' => $validated['sous_total'],
-                    'tva' => $validated['tva'],
                     'total_ttc' => $validated['total_ttc'],
                 ]);
 

@@ -12,8 +12,7 @@ class Devis extends Model
 
 
     protected $fillable = [
-        'client_id', 'numero_devis', 'description', 'quantite', 'nombre_jours',
-        'prix_unitaire', 'taxe', 'sous_total', 'tva', 'total_ttc',
+        'client_id', 'numero_devis','sous_total', 'total_ttc',
         'condition_reglement', 'date_evenement', 'statut'
     ];
 

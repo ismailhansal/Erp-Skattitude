@@ -22,7 +22,6 @@ class Facture extends Model
         'date_echeance',
         'condition_reglement',
         'sous_total',
-        'tva',
         'total_ttc',
         'statut',
    
@@ -36,7 +35,6 @@ class Facture extends Model
         'date_echeance' => 'date',
         'date_evenement' => 'date',
         'sous_total' => 'decimal:2',
-        'tva' => 'decimal:2',
         'total_ttc' => 'decimal:2',
     ];
 

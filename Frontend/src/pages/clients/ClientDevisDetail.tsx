@@ -177,6 +177,9 @@ const ClientDevisDetail: React.FC = () => {
     return 'pending';
   };
 
+
+
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -341,7 +344,7 @@ const ClientDevisDetail: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">TVA</span>
-                  <span className="text-foreground">{formatCurrency(devis.montantTva)}</span>
+                  <span className="text-foreground">{formatCurrency(devis.tva)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">

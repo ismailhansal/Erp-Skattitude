@@ -63,7 +63,6 @@ interface Facture {
   condition_reglement: string;
   statut: string;
   sous_total: number;
-  tva: number;
   total_ttc: number;
   created_at: string;
   updated_at: string;
@@ -153,6 +152,15 @@ const ClientFactureDetail: React.FC = () => {
     if (isOverdue) return 'overdue';
     return 'unpaid';
   };
+
+
+
+        // Avant le return du composant
+const tva_calcul = facture.lignes.reduce((acc, ligne) => {
+  const totalHT = ligne.quantite * ligne.nombre_jours * ligne.prix_unitaire;
+  const tvaMontant = totalHT * (ligne.tva / 100); // TVA de la ligne
+  return acc + tvaMontant;
+}, 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -318,9 +326,15 @@ const ClientFactureDetail: React.FC = () => {
     </tr>
   )}
 
+
+
   {facture.lignes.map((ligne) => {
     const totalHT =
       ligne.quantite * ligne.nombre_jours * ligne.prix_unitaire;
+
+
+
+   
 
     return (
       <tr key={ligne.id} className="border-t border-border">
@@ -370,7 +384,7 @@ const ClientFactureDetail: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">TVA</span>
-                  <span className="text-foreground">{formatCurrency(facture.tva)}</span>
+                  <span className="text-foreground">{formatCurrency(tva_calcul)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
