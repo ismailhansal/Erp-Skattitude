@@ -6,6 +6,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DevisController;
 use App\Http\Controllers\FactureController;
 use App\Http\Controllers\BonLivraisonController;
+use App\Http\Controllers\EntrepriseController;
 
 // Exemple utilisateur authentifié (resté par défaut)
 Route::get('/user', function (Request $request) {
@@ -57,3 +58,11 @@ Route::put('/clients/{client}/devis', [DevisController::class, 'update']);
 
 //R écupérer une facture précise pour un client précis
 Route::put('/clients/{client}/factures/{facture}', [FactureController::class, 'update']);
+
+
+
+// Routes pour l'entreprise (config)
+Route::get('/entreprise', [EntrepriseController::class, 'index']); // Récupérer
+Route::post('/entreprise', [EntrepriseController::class, 'store']); // Créer
+Route::put('/entreprise/{id}', [EntrepriseController::class, 'update']); // Mettre à jour
+Route::delete('/entreprise/{id}', [EntrepriseController::class, 'destroy']);

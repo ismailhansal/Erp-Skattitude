@@ -7,6 +7,10 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { MainLayout } from "@/components/layout/MainLayout";
 
+//context pour config entreprise
+import { EntrepriseProvider } from "@/contexts/EntrepriseContext";
+
+
 // Pages
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -94,13 +98,16 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
+          <EntrepriseProvider> {/* <-- ici */}
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </EntrepriseProvider>
         </TooltipProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
+
 
 export default App;
