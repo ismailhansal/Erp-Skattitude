@@ -26,7 +26,7 @@ class DevisController extends Controller
     public function getByClient($clientId)
 {
     // Récupère tous les devis pour ce client
-    $devis = Devis::where('client_id', $clientId)->get();
+$devis = Devis::with('lignes')->where('client_id', $clientId)->get();
     return response()->json($devis);
 }
 

@@ -22,71 +22,97 @@ const ClientDetail: React.FC = () => {
   const [devis, setDevis] = useState<Devis[]>([]);
   const [factures, setFactures] = useState<Facture[]>([]);
   const [loading, setLoading] = useState(true);
-useEffect(() => {
-  const fetchClientData = async () => {
-    try {
-      // 1️⃣ Client
-      const clientRes = await axios.get<Client>(
-        `http://127.0.0.1:8000/api/clients/${clientId}`
-      );
 
-      setClient({
-        ...clientRes.data,
-        id: clientRes.data.id.toString(),
-      });
+  useEffect(() => {
+    const fetchClientData = async () => {
+      try {
+        // 1️⃣ Client
+        const clientRes = await axios.get<Client>(
+          `http://127.0.0.1:8000/api/clients/${clientId}`
+        );
 
-      // 2️⃣ Devis
-      const devisRes = await axios.get<any[]>(
-        `http://127.0.0.1:8000/api/clients/${clientId}/devis`
-      );
+        setClient({
+          ...clientRes.data,
+          id: clientRes.data.id.toString(),
+        });
 
-      setDevis(
-        devisRes.data.map(d => ({
-          ...d,
-          id: d.id.toString(),
-          numero: d.numero_devis || '',
-          totalTTC: Number(d.total_ttc) || 0,
+        // 2️⃣ Devis
+        const devisRes = await axios.get<any[]>(
+          `http://127.0.0.1:8000/api/clients/${clientId}/devis`
+        );
 
-          dateCreation: d.created_at ? new Date(d.created_at) : null,
-          dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
+        setDevis(
+          devisRes.data.map(d => {
+            // Construire une description depuis les lignes
+            let description = 'Aucune prestation';
+            if (d.lignes && d.lignes.length > 0) {
+              // Prendre la première ligne
+              description = d.lignes[0].description;
+              
+              // Si plusieurs lignes, ajouter un compteur
+              if (d.lignes.length > 1) {
+                description += ` (+${d.lignes.length - 1} autre${d.lignes.length > 2 ? 's' : ''})`;
+              }
+            }
 
-          estFacture: d.statut === 'facturé',
-          statut: d.statut,
-        }))
-      );
+            return {
+              ...d,
+              id: d.id.toString(),
+              numero: d.numero_devis || '',
+              totalTTC: Number(d.total_ttc) || 0,
+              description, // Description construite depuis les lignes
+              dateCreation: d.created_at ? new Date(d.created_at) : null,
+              dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
+              estFacture: d.statut === 'facturé',
+              statut: d.statut,
+            };
+          })
+        );
 
-      // 3️⃣ Factures
-      const facturesRes = await axios.get<any[]>(
-        `http://127.0.0.1:8000/api/clients/${clientId}/factures`
-      );
+        // 3️⃣ Factures
+        const facturesRes = await axios.get<any[]>(
+          `http://127.0.0.1:8000/api/clients/${clientId}/factures`
+        );
 
-      setFactures(
-        facturesRes.data.map(f => ({
-          ...f,
-          id: f.id.toString(),
-          numero: f.numero_facture || '',
-          totalTTC: Number(f.total_ttc) || 0,
+        setFactures(
+          facturesRes.data.map(f => {
+            // Construire une description depuis les lignes
+            let description = 'Aucune prestation';
+            if (f.lignes && f.lignes.length > 0) {
+              // Prendre la première ligne
+              description = f.lignes[0].description;
+              
+              // Si plusieurs lignes, ajouter un compteur
+              if (f.lignes.length > 1) {
+                description += ` (+${f.lignes.length - 1} autre${f.lignes.length > 2 ? 's' : ''})`;
+              }
+            }
 
-          dateFacturation: f.created_at ? new Date(f.created_at) : null,
-          dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
+            return {
+              ...f,
+              id: f.id.toString(),
+              numero: f.numero_facture || '',
+              totalTTC: Number(f.total_ttc) || 0,
+              description, // Description construite depuis les lignes
+              dateFacturation: f.created_at ? new Date(f.created_at) : null,
+              dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
+              estPayee: f.statut === 'payé',
+              statut: f.statut,
+            };
+          })
+        );
 
-          estPayee: f.statut === 'payé',
-          statut: f.statut,
-        }))
-      );
+        setLoading(false);
+      } catch (err) {
+        console.error(err);
+        setLoading(false);
+      }
+    };
 
-      setLoading(false);
-    } catch (err) {
-      console.error(err);
-      setLoading(false);
-    }
-  };
+    fetchClientData();
+  }, [clientId]);
 
-  fetchClientData();
-}, [clientId]);
-
-
-  if (loading) return <p className="text-center mt-10"> </p>;
+  if (loading) return <p className="text-center mt-10">Chargement...</p>;
   if (!client)
     return (
       <div className="flex items-center justify-center h-96">
@@ -100,18 +126,47 @@ useEffect(() => {
 
   // Colonnes Devis
   const devisColumns = [
-    { key: 'numero_devis', header: 'N° Devis', render: (item: Devis) => <span className="font-mono font-medium">{item.numero}</span> },
-    { key: 'totalttc', header: 'Montant', render: (item: Devis) => formatCurrency(item.totalTTC) },
-    { key: 'dateCreation', header: 'Création', render: (item: Devis) => item.dateCreation ? format(item.dateCreation, 'dd MMM yyyy', { locale: fr }) : '-' },
-    { key: 'dateEvenement', header: 'Événement', render: (item: Devis) => {
+    { 
+      key: 'numero_devis', 
+      header: 'N° Devis', 
+      render: (item: Devis) => <span className="font-mono font-medium">{item.numero}</span> 
+    },
+    { 
+      key: 'description', 
+      header: 'Description', 
+      render: (item: Devis) => (
+        <span className="font-medium text-sm max-w-xs truncate block" title={item.description}>
+          {item.description}
+        </span>
+      )
+    },
+    { 
+      key: 'totalttc', 
+      header: 'Montant', 
+      render: (item: Devis) => formatCurrency(item.totalTTC) 
+    },
+    { 
+      key: 'dateCreation', 
+      header: 'Création', 
+      render: (item: Devis) => item.dateCreation ? format(item.dateCreation, 'dd MMM yyyy', { locale: fr }) : '-' 
+    },
+    { 
+      key: 'dateEvenement', 
+      header: 'Événement', 
+      render: (item: Devis) => {
         if (!item.dateEvenement) return '-';
         const isPast = !item.estFacture && isBefore(item.dateEvenement, today);
-        return <span className={isPast ? 'text-destructive font-medium' : ''}>
-          {format(item.dateEvenement, 'dd MMM yyyy', { locale: fr })}
-        </span>;
+        return (
+          <span className={isPast ? 'text-destructive font-medium' : ''}>
+            {format(item.dateEvenement, 'dd MMM yyyy', { locale: fr })}
+          </span>
+        );
       }
     },
-    { key: 'statut', header: 'Statut', render: (item: Devis) => {
+    { 
+      key: 'statut', 
+      header: 'Statut', 
+      render: (item: Devis) => {
         if (!item.dateEvenement) return <StatusBadge variant="pending" />;
         const isPast = !item.estFacture && isBefore(item.dateEvenement, today);
         if (item.estFacture) return <StatusBadge variant="invoiced" />;
@@ -123,10 +178,34 @@ useEffect(() => {
 
   // Colonnes Factures
   const facturesColumns = [
-    { key: 'numero', header: 'N° Facture', render: (item: Facture) => <span className="font-mono font-medium">{item.numero}</span> },
-    { key: 'totalttc', header: 'Montant', render: (item: Facture) => formatCurrency(item.totalTTC) },
-    { key: 'dateFacturation', header: 'Date', render: (item: Facture) => item.dateFacturation ? format(item.dateFacturation, 'dd MMM yyyy', { locale: fr }) : '-' },
-    { key: 'status', header: 'Statut', render: (item: Facture) => {
+    { 
+      key: 'numero', 
+      header: 'N° Facture', 
+      render: (item: Facture) => <span className="font-mono font-medium">{item.numero}</span> 
+    },
+    { 
+      key: 'description', 
+      header: 'Description', 
+      render: (item: Facture) => (
+        <span className="font-medium text-sm max-w-xs truncate block" title={item.description}>
+          {item.description}
+        </span>
+      )
+    },
+    { 
+      key: 'totalttc', 
+      header: 'Montant', 
+      render: (item: Facture) => formatCurrency(item.totalTTC) 
+    },
+    { 
+      key: 'dateFacturation', 
+      header: 'Date', 
+      render: (item: Facture) => item.dateFacturation ? format(item.dateFacturation, 'dd MMM yyyy', { locale: fr }) : '-' 
+    },
+    { 
+      key: 'status', 
+      header: 'Statut', 
+      render: (item: Facture) => {
         if (!item.dateEcheance) return <StatusBadge variant={item.estPayee ? 'paid' : 'unpaid'} />;
         const isOverdue = !item.estPayee && isBefore(item.dateEcheance, today);
         return <StatusBadge variant={item.estPayee ? 'paid' : isOverdue ? 'overdue' : 'unpaid'} />;
