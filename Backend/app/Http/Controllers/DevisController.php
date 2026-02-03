@@ -188,11 +188,43 @@ $ligne_tva = ($ligne_total * $ligne['tva']) / 100;
 }
 
 
-    // Supprimer un devis
-    public function destroy($id)
+    
+    // DELETE /api/clients/{clientId}/devis/{devisId} - Supprimer un devis spécifique
+    public function destroy($clientId, $devisId)
     {
-        $devis = Devis::findOrFail($id);
-        $devis->delete();
-        return response()->json(['message' => 'Devis supprimé']);
+        try {
+            // Vérifier que le client existe
+            $client = Client::findOrFail($clientId);
+            
+            // Trouver le devis qui appartient à ce client
+            $devis = $client->devis()->findOrFail($devisId);
+            
+            // Log pour debug
+            \Log::info("🗑️ Suppression du devis ID: {$devisId} du client ID: {$clientId}");
+            
+            // Supprimer le devis (les articles liés seront supprimés en cascade si configuré)
+            $devis->delete();
+            
+            \Log::info("✅ Devis supprimé avec succès");
+            
+            return response()->json([
+                'message' => 'Devis supprimé avec succès',
+                'devis_id' => $devisId,
+                'client_id' => $clientId
+            ], 200);
+            
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            \Log::error("❌ Devis ou client non trouvé: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Devis ou client non trouvé',
+                'error' => $e->getMessage()
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error("❌ Erreur lors de la suppression: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Erreur lors de la suppression du devis',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

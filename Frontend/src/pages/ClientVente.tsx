@@ -11,6 +11,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Devis, Facture, Client } from '@/types';
 import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
 
 const ClientVente: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
@@ -91,6 +98,54 @@ const ClientVente: React.FC = () => {
     fetchClientVentes();
   }, [clientId]);
 
+
+
+  // Fonction pour supprimer un devis
+  const handleDeleteDevis = async (devisId: string) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce devis ?')) {
+      return;
+    }
+
+    try {
+      console.log(`🗑️ Suppression du devis ${devisId} pour le client ${clientId}`);
+      
+      await axios.delete(`http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}`);
+      
+      // Mettre à jour la liste locale
+      setDevis(prev => prev.filter(d => d.id !== devisId));
+      
+      console.log('✅ Devis supprimé avec succès');
+      alert('Devis supprimé avec succès');
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la suppression:', err);
+      console.error('Réponse serveur:', err.response?.data);
+      alert('Erreur lors de la suppression du devis');
+    }
+  };
+
+  // Fonction pour supprimer une facture (si besoin)
+  const handleDeleteFacture = async (factureId: string) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette facture ?')) {
+      return;
+    }
+
+    try {
+      console.log(`🗑️ Suppression de la facture ${factureId} pour le client ${clientId}`);
+      
+      await axios.delete(`http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`);
+      
+      // Mettre à jour la liste locale
+      setFactures(prev => prev.filter(f => f.id !== factureId));
+      
+      console.log('✅ Facture supprimée avec succès');
+      alert('Facture supprimée avec succès');
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la suppression:', err);
+      console.error('Réponse serveur:', err.response?.data);
+      alert('Erreur lors de la suppression de la facture');
+    }
+  };
+
   if (loading) return <p className="text-center mt-10">Chargement...</p>;
 
   if (!client)
@@ -154,6 +209,53 @@ const ClientVente: React.FC = () => {
         return <StatusBadge variant="pending" />;
       } 
     },
+
+    {
+          key: 'actions',
+          header: '',
+          className: 'w-12',
+          render: (item: Devis) => (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/clients/${clientId}/devis/${item.id}`);
+                  }}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Voir
+                </DropdownMenuItem>
+    
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/clients/${clientId}/devis/${item.id}/edit`);
+                  }}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Modifier
+                </DropdownMenuItem>
+    
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteDevis(item.id);
+                  }}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ),
+        },
   ];
 
   const facturesColumns = [

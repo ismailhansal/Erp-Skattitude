@@ -312,43 +312,39 @@ class FactureController extends Controller
     /**
      * Supprimer une facture
      */
-    public function destroy($clientId, $factureId)
+     public function destroy($clientId, $factureId)
     {
         try {
-            $facture = Facture::where('id', $factureId)
-                ->where('client_id', $clientId)
-                ->firstOrFail();
-
-            DB::beginTransaction();
-
-            try {
-                // Si la facture provient d'un devis, remettre le devis en attente
-                if ($facture->devis_id) {
-                    $devis = Devis::find($facture->devis_id);
-                    if ($devis) {
-                        $devis->update(['statut' => 'en_attente']);
-                    }
-                }
-
-                // Supprimer la facture (les lignes seront supprimées en cascade)
-                $facture->delete();
-
-                DB::commit();
-
-                return response()->json(['message' => 'Facture supprimée avec succès']);
-
-            } catch (\Exception $e) {
-                DB::rollBack();
-                throw $e;
-            }
-
-        } catch (\Exception $e) {
-            Log::error('Erreur destroy facture:', [
-                'error' => $e->getMessage()
-            ]);
+            // Vérifier que le client existe
+            $client = Client::findOrFail($clientId);
+            
+            // Trouver la facture qui appartient à ce client
+            $facture = $client->factures()->findOrFail($factureId);
+            
+            // Log pour debug
+            \Log::info("🗑️ Suppression de la facture ID: {$factureId} du client ID: {$clientId}");
+            
+            // Supprimer la facture (les lignes liées seront supprimées en cascade si configuré)
+            $facture->delete();
+            
+            \Log::info("✅ Facture supprimée avec succès");
             
             return response()->json([
-                'message' => 'Erreur lors de la suppression',
+                'message' => 'Facture supprimée avec succès',
+                'facture_id' => $factureId,
+                'client_id' => $clientId
+            ], 200);
+            
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            \Log::error("❌ Facture ou client non trouvé: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Facture ou client non trouvé',
+                'error' => $e->getMessage()
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error("❌ Erreur lors de la suppression: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Erreur lors de la suppression de la facture',
                 'error' => $e->getMessage()
             ], 500);
         }

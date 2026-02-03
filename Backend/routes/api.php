@@ -80,3 +80,8 @@ Route::get('/factures/{facture}/pdf', [FacturePdfController::class, 'download'])
 
 // Marquer une facture comme payée
 Route::put('/clients/{client}/factures/{facture}/mark-paid', [FactureController::class, 'markAsPaid']);
+
+Route::delete('/clients/{client}/devis/{devisId}', [DevisController::class, 'destroy']);
+
+// Supprimer une facture spécifique d'un client
+Route::delete('/clients/{client}/factures/{factureId}', [FactureController::class, 'destroy']);

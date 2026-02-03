@@ -204,53 +204,53 @@ const handleSubmit = async (e: React.FormEvent) => {
       header: 'Créé le',
       render: (item: Client) => format(item.created_at, 'dd MMM yyyy', { locale: fr }),
     },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-12',
-      render: (item: Client) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-           <DropdownMenuItem
-  onClick={(e) => {
-    e.stopPropagation();
-    navigate(`/clients/${item.id}`);
-  }}
->
-  <Eye className="h-4 w-4 mr-2" />
-  Voir
-</DropdownMenuItem>
+            {
+              key: 'actions',
+              header: '',
+              className: 'w-12',
+              render: (item: Client) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/clients/${item.id}`);
+          }}
+        >
+          <Eye className="h-4 w-4 mr-2" />
+          Voir
+        </DropdownMenuItem>
 
-<DropdownMenuItem
-  onClick={(e) => {
-    e.stopPropagation();
-    handleOpenDialog(item);
-  }}
->
-  <Edit className="h-4 w-4 mr-2" />
-  Modifier
-</DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOpenDialog(item);
+          }}
+        >
+          <Edit className="h-4 w-4 mr-2" />
+          Modifier
+        </DropdownMenuItem>
 
-<DropdownMenuItem
-  onClick={(e) => {
-    e.stopPropagation();
-    handleDelete(item);
-  }}
-  className="text-destructive focus:text-destructive"
->
-  <Trash2 className="h-4 w-4 mr-2" />
-  Supprimer
-</DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete(item);
+          }}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Supprimer
+        </DropdownMenuItem>
 
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ),
+            },
   ];
 
   return (
