@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Save, Building2, FileText, Palette } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, Building2, FileText, Palette, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,24 +7,145 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockConfiguration } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
+import { entrepriseService, EntrepriseData } from '@/services/entrepriseService';
 import logo from '@/assets/logo.png';
+
+interface ConfigState {
+  id?: number;
+  nomEntreprise: string;
+  adresse: string;
+  ville: string;
+  telephone1: string;
+  telephone2: string;
+  email: string;
+  ice: string;
+  rc: string;
+  numeroTva: string;
+  patente: string;
+  cnss: string;
+  rib: string;
+  mentionsLegales: string;
+  couleurAccent: string;
+}
 
 const Configuration: React.FC = () => {
   const { toast } = useToast();
-  const [config, setConfig] = useState(mockConfiguration);
+  const [config, setConfig] = useState<ConfigState>({
+    nomEntreprise: '',
+    adresse: '',
+    ville: '',
+    telephone1: '',
+    telephone2: '',
+    email: '',
+    ice: '',
+    rc: '',
+    numeroTva: '',
+    patente: '',
+    cnss: '',
+    rib: '',
+    mentionsLegales: '',
+    couleurAccent: '#3b82f6',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    toast({
-      title: 'Configuration enregistrée',
-      description: 'Vos paramètres ont été sauvegardés avec succès.',
-    });
+  // Charger les données au montage du composant
+  useEffect(() => {
+    loadConfiguration();
+  }, []);
+
+  const loadConfiguration = async () => {
+    try {
+      setLoading(true);
+      const data = await entrepriseService.getConfiguration();
+      
+      // Mapper les données du backend vers le state frontend
+      setConfig({
+        id: data.id,
+        nomEntreprise: data.nom || '',
+        adresse: data.adresse || '',
+        ville: data.ville || '',
+        telephone1: data.telephone_1 || '',
+        telephone2: data.telephone_2 || '',
+        email: data.email || '',
+        ice: data.ICE || '',
+        rc: data.RC || '',
+        numeroTva: data.TVA || '',
+        patente: data.patente || '',
+        cnss: data.CNSS || '',
+        rib: data.RIB || '',
+        mentionsLegales: '',
+        couleurAccent: data.couleur_accent || '#3b82f6',
+      });
+    } catch (error) {
+      console.error('Erreur lors du chargement de la configuration:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de charger la configuration de l\'entreprise.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleChange = (field: string, value: string) => {
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+
+      // Mapper les données du frontend vers le format backend
+      const dataToSave: Partial<EntrepriseData> = {
+        nom: config.nomEntreprise,
+        adresse: config.adresse,
+        ville: config.ville,
+        telephone_1: config.telephone1,
+        telephone_2: config.telephone2,
+        email: config.email,
+        ICE: config.ice,
+        RC: config.rc,
+        TVA: config.numeroTva,
+        patente: config.patente,
+        CNSS: config.cnss,
+        RIB: config.rib,
+        couleur_accent: config.couleurAccent,
+      };
+
+      // Le backend gère automatiquement la création ou mise à jour
+      const result = await entrepriseService.saveEntreprise(dataToSave);
+      
+      // Mettre à jour l'ID si c'était une création
+      if (result.id && !config.id) {
+        setConfig(prev => ({ ...prev, id: result.id }));
+      }
+
+      toast({
+        title: 'Configuration enregistrée',
+        description: 'Vos paramètres ont été sauvegardés avec succès.',
+      });
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de sauvegarder la configuration.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChange = (field: keyof ConfigState, value: string) => {
     setConfig((prev) => ({ ...prev, [field]: value }));
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -32,9 +153,18 @@ const Configuration: React.FC = () => {
         title="Configuration"
         description="Paramétrez votre entreprise et vos documents"
         actions={
-          <Button onClick={handleSave}>
-            <Save className="h-4 w-4 mr-2" />
-            Enregistrer
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Enregistrement...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Enregistrer
+              </>
+            )}
           </Button>
         }
       />
