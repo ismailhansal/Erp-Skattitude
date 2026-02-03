@@ -76,3 +76,7 @@ Route::get('/devis/{devis}/pdf', [DevisPdfController::class, 'download']);
 
 // Générer et télécharger le PDF d'une facture
 Route::get('/factures/{facture}/pdf', [FacturePdfController::class, 'download']);
+
+
+// Marquer une facture comme payée
+Route::put('/clients/{client}/factures/{facture}/mark-paid', [FactureController::class, 'markAsPaid']);

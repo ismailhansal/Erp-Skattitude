@@ -120,8 +120,9 @@ const ClientDetail: React.FC = () => {
       </div>
     );
 
-  const totalCA = factures.filter(f => f.estPayee).reduce((acc, f) => acc + f.totalTTC, 0);
-  const formatCurrency = (amount: number) =>
+const totalCA = factures
+  .filter(f => f.estPayee || f.statut === 'payé') // Vérifie les deux propriétés
+  .reduce((acc, f) => acc + f.totalTTC, 0);  const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount);
 
   // Colonnes Devis
@@ -247,7 +248,7 @@ const ClientDetail: React.FC = () => {
                 <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                 <div>
                   <p className="font-medium">{client.adresse}</p>
-                  <p className="text-muted-foreground">{client.codePostal} {client.ville}, {client.pays}</p>
+                  <p className="text-muted-foreground"> {client.ville}, {client.pays}</p>
                 </div>
               </div>
             </div>

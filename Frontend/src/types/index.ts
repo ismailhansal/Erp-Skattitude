@@ -1,5 +1,5 @@
 export interface Client {
-  id: number;
+  id: string;
   nom_societe: string;
   adresse: string;
   ville: string;
@@ -13,7 +13,6 @@ export interface Client {
   factures?: Facture[];
 }
 
-
 export interface LigneDocument {
   id: string;
   description: string;
@@ -26,6 +25,7 @@ export interface LigneDocument {
 export interface Devis {
   id: string;
   numero: string;
+  description?: string; // ⚠️ AJOUTÉ
   clientId: string;
   client?: Client;
   lignes: LigneDocument[];
@@ -42,6 +42,7 @@ export interface Devis {
 export interface Facture {
   id: string;
   numero: string;
+  description?: string; // ⚠️ AJOUTÉ
   devisId?: string;
   devis?: Devis;
   clientId: string;

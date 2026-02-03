@@ -118,6 +118,7 @@ const ClientVente: React.FC = () => {
       header: 'Description', 
       render: (item: Devis) => (
         <span className="font-medium text-sm max-w-xs truncate block" title={item.description}>
+          {item.description}
         </span>
       )
     },

@@ -129,12 +129,33 @@ const ClientFactureDetail: React.FC = () => {
     });
   };
 
-  const handleMarquerPayee = () => {
+  const handleMarquerPayee = async () => {
     if (!facture) return;
-    toast({
-      title: 'Facture marquée comme payée',
-      description: `La facture ${facture.numero_facture} a été marquée comme payée.`,
-    });
+    
+    try {
+      await axios.put(
+        `http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}/mark-paid`
+      );
+      
+      toast({
+        title: 'Facture marquée comme payée',
+        description: `La facture ${facture.numero_facture} a été marquée comme payée.`,
+      });
+      
+      // Recharger la facture pour mettre à jour le statut
+      const res = await axios.get<Facture>(
+        `http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`
+      );
+      setFacture(res.data);
+      
+    } catch (error) {
+      console.error('Erreur lors du marquage de la facture:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de marquer la facture comme payée.',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (loading) return <p>Chargement...</p>;
@@ -148,9 +169,9 @@ const ClientFactureDetail: React.FC = () => {
     </div>
   );
 
-  const isOverdue = facture.statut !== 'payee' && parseDateSafe(facture.date_echeance) && isBefore(parseDateSafe(facture.date_echeance)!, today);
+  const isOverdue = facture.statut !== 'payé' && parseDateSafe(facture.date_echeance) && isBefore(parseDateSafe(facture.date_echeance)!, today);
   const getStatus = () => {
-    if (facture.statut === 'payee') return 'paid';
+    if (facture.statut === 'payé') return 'paid';
     if (isOverdue) return 'overdue';
     return 'unpaid';
   };
@@ -181,7 +202,7 @@ const ClientFactureDetail: React.FC = () => {
               Modifier
             </Button>
 
-            {facture.statut !== 'payee' && (
+            {facture.statut !== 'payé' && (
               <>
                 <Button variant="outline" onClick={handleRelancer}>
                   <Send className="h-4 w-4 mr-2" />

@@ -110,7 +110,7 @@ class FactureController extends Controller
                     'condition_reglement' => $validated['condition_reglement'],
                     'sous_total' => $validated['sous_total'],
                     'total_ttc' => $validated['total_ttc'],
-                    'statut' => 'impayee',
+                    'statut' => 'impayé',
                     'montant_tva' => $validated['montant_tva'],
                 ]);
 
@@ -127,7 +127,7 @@ class FactureController extends Controller
                 }
 
                 // 7. Mettre à jour le statut du devis
-                $devis->update(['statut' => 'facturé']);
+                $devis->update(['statut' => 'payé']);
 
                 DB::commit();
 
@@ -368,4 +368,43 @@ class FactureController extends Controller
         
         return sprintf('FAC/%s/%04d', $year, $number);
     }
+
+
+
+    /**
+ * Marquer une facture comme payée
+ * Route: PUT /api/clients/{client}/factures/{facture}/mark-paid
+ */
+public function markAsPaid($clientId, $factureId)
+{
+    try {
+        $facture = Facture::where('id', $factureId)
+            ->where('client_id', $clientId)
+            ->firstOrFail();
+
+        // Vérifier que la facture n'est pas déjà payée
+        if ($facture->statut === 'payé') {
+            return response()->json([
+                'message' => 'Cette facture est déjà marquée comme payée'
+            ], 400);
+        }
+
+        $facture->update(['statut' => 'payé']);
+
+        return response()->json([
+            'message' => 'Facture marquée comme payée',
+            'facture' => $facture->load('client', 'lignes', 'devis')
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Erreur markAsPaid:', [
+            'error' => $e->getMessage()
+        ]);
+        
+        return response()->json([
+            'message' => 'Erreur lors de la mise à jour',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 }
