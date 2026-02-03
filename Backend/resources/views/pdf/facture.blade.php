@@ -25,7 +25,7 @@
             margin-bottom: 5px;
         }
 
-        .devis-title {
+        .facture-title {
             font-size: 22px;
             font-weight: bold;
             margin-bottom: 5px;
@@ -169,12 +169,34 @@
             margin: 2px 0;
         }
         
-        .devis-info-section {
+        .facture-info-section {
             margin-top: 20px;
         }
         
-        .devis-info-section div {
+        .facture-info-section div {
             margin: 5px 0;
+        }
+        
+        .facture-details {
+            display: table;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .facture-details-row {
+            display: table-row;
+        }
+        
+        .facture-details-label {
+            display: table-cell;
+            width: 150px;
+            font-weight: bold;
+            padding: 3px 0;
+        }
+        
+        .facture-details-value {
+            display: table-cell;
+            padding: 3px 0;
         }
     </style>
 </head>
@@ -200,16 +222,34 @@
     
     <!-- Client sous SK Attitude avec séparation -->
     <div class="client-container">
-<div>{{ strtoupper($client->nom_societe) }}</div>
+        <div>{{ strtoupper($client->nom_societe) }}</div>
         <div>{{ $client->adresse }}</div>
-<div>{{ strtoupper($client->ville) }}</div>
+        <div>{{ strtoupper($client->ville) }}</div>
     </div>
 </div>
 
-<!-- Informations du devis en bas à gauche -->
-<div class="devis-info-section">
-    <div class="devis-title">DEVIS N° {{ $devis->numero_devis }}</div>
-    <div><strong>Date du devis :</strong> {{ $devis->created_at->format('d/m/Y H:i:s') }}</div>
+<!-- Informations de la facture en bas à gauche -->
+<div class="facture-info-section">
+    <div class="facture-title">Facture {{ $facture->numero_facture }}</div>
+    
+    <div class="facture-details">
+        <div class="facture-details-row">
+            <div class="facture-details-label">Date facture :</div>
+            <div class="facture-details-value">{{ $facture->created_at->format('d/m/Y') }}</div>
+        </div>
+        <div class="facture-details-row">
+            <div class="facture-details-label">Date d'échéance :</div>
+            <div class="facture-details-value">{{ $facture->date_echeance }}</div>
+        </div>
+        <div class="facture-details-row">
+            <div class="facture-details-label">Origine :</div>
+    <div class="facture-details-value">{{ $devis->numero_devis ?? ($facture->devis->numero_devis ?? 'N/A') }}</div>
+        </div>
+        <div class="facture-details-row">
+            <div class="facture-details-label">ICE :</div>
+            <div class="facture-details-value">{{ $client->ice ?? '001814201000035' }}</div>
+        </div>
+    </div>
 </div>
 
 <!-- SEPARATEUR -->
@@ -224,18 +264,18 @@
             <th>Nbr jours</th>
             <th>Prix unitaire</th>
             <th>Taxes</th>
-            <th class="price-col">Prix</th>
+            <th class="price-col">Montant HT</th>
         </tr>
     </thead>
     <tbody>
-        @foreach($devis->lignes as $ligne)
+        @foreach($facture->lignes as $ligne)
         <tr>
             <td class="description-col">{{ $ligne->description }}</td>
             <td>{{ number_format($ligne->quantite, 0, ',', ' ') }}</td>
             <td>{{ number_format($ligne->nombre_jours, 2, ',', ' ') }}</td>
             <td>{{ number_format($ligne->prix_unitaire, 2, ',', ' ') }} MAD</td>
             <td>TVA 20% VENTES</td>
-            <td class="price-col">{{ number_format($devis->sous_total, 2, ',', ' ') }} MAD</td>
+            <td class="price-col">{{ number_format($facture->sous_total, 2, ',', ' ') }} MAD</td>
         </tr>
         @endforeach
     </tbody>
@@ -245,16 +285,16 @@
 <div class="totals-section">
     <table class="totals-table">
         <tr>
-            <td class="total-label">Total hors-taxe</td>
-            <td class="total-value">{{ number_format($devis->sous_total, 2, ',', ' ') }} MAD</td>
+            <td class="total-label">Sous-total</td>
+            <td class="total-value">{{ number_format($facture->sous_total, 2, ',', ' ') }} MAD</td>
         </tr>
         <tr>
             <td class="total-label">TVA 20% VENTES</td>
-            <td class="total-value">{{ number_format($devis->montant_tva, 2, ',', ' ') }} MAD</td>
+            <td class="total-value">{{ number_format($facture->montant_tva, 2, ',', ' ') }} MAD</td>
         </tr>
         <tr>
             <td class="total-label"><strong>Total</strong></td>
-            <td class="total-value"><strong>{{ number_format($devis->total_ttc, 2, ',', ' ') }} MAD</strong></td>
+            <td class="total-value"><strong>{{ number_format($facture->total_ttc, 2, ',', ' ') }} MAD</strong></td>
         </tr>
     </table>
 </div>

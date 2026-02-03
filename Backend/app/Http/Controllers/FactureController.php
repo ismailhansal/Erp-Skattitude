@@ -78,6 +78,8 @@ class FactureController extends Controller
                 'lignes.*.tva' => 'required|numeric|min:0',
                 'sous_total' => 'required|numeric',
                 'total_ttc' => 'required|numeric',
+                'montant_tva' => 'required|numeric',
+
             ]);
 
             // 2. Vérifier que le devis existe et appartient au client
@@ -109,6 +111,7 @@ class FactureController extends Controller
                     'sous_total' => $validated['sous_total'],
                     'total_ttc' => $validated['total_ttc'],
                     'statut' => 'impayee',
+                    'montant_tva' => $validated['montant_tva'],
                 ]);
 
                 // 6. Créer les lignes de facture
@@ -176,7 +179,7 @@ class FactureController extends Controller
                 'lignes.*.prix_unitaire' => 'required|numeric|min:0',
                 'lignes.*.tva' => 'required|numeric|min:0',
                 'sous_total' => 'required|numeric',
-                'tva' => 'required|numeric',
+                'montant_tva' => 'required|numeric',
                 'total_ttc' => 'required|numeric',
             ]);
 
@@ -192,7 +195,7 @@ class FactureController extends Controller
                     'date_echeance' => $validated['date_echeance'] ?? null,
                     'condition_reglement' => $validated['condition_reglement'],
                     'sous_total' => $validated['sous_total'],
-                    'tva' => $validated['tva'],
+                    'montant_tva' => $validated['montant_tva'],
                     'total_ttc' => $validated['total_ttc'],
                     'statut' => 'impayee',
                 ]);
@@ -253,6 +256,7 @@ class FactureController extends Controller
                 'lignes.*.tva' => 'required|numeric|min:0',
                 'sous_total' => 'required|numeric',
                 'total_ttc' => 'required|numeric',
+                'montant_tva' => 'required|numeric',
             ]);
 
             DB::beginTransaction();
@@ -265,6 +269,7 @@ class FactureController extends Controller
                     'condition_reglement' => $validated['condition_reglement'],
                     'sous_total' => $validated['sous_total'],
                     'total_ttc' => $validated['total_ttc'],
+                    'montant_tva' => $validated['montant_tva'],
                 ]);
 
                 // Supprimer les anciennes lignes

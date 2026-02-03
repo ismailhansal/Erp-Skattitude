@@ -18,8 +18,6 @@ import { Separator } from '@/components/ui/separator';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { format, isBefore, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FacturePrintView } from '@/components/documents/FacturePrintView';
 import { useToast } from '@/hooks/use-toast';
 
 interface LigneFacture {
@@ -30,7 +28,6 @@ interface LigneFacture {
   prix_unitaire: number;
   tva: number;
 }
-
 
 interface Client {
   id: number;
@@ -71,7 +68,6 @@ interface Facture {
   lignes: LigneFacture[];
 }
 
-
 const ClientFactureDetail: React.FC = () => {
   const { clientId, factureId } = useParams<{ clientId: string; factureId: string }>();
   const navigate = useNavigate();
@@ -81,7 +77,6 @@ const ClientFactureDetail: React.FC = () => {
   const [facture, setFacture] = useState<Facture | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showFacturePrint, setShowFacturePrint] = useState(false);
 
   // Helper safe pour parser les dates
   const parseDateSafe = (dateStr?: string) => {
@@ -119,6 +114,13 @@ const ClientFactureDetail: React.FC = () => {
     fetchFacture();
   }, [clientId, factureId]);
 
+  const downloadFacturePDF = () => {
+    window.open(
+      `http://127.0.0.1:8000/api/factures/${factureId}/pdf`,
+      '_blank'
+    );
+  };
+
   const handleRelancer = () => {
     if (!facture) return;
     toast({
@@ -153,14 +155,12 @@ const ClientFactureDetail: React.FC = () => {
     return 'unpaid';
   };
 
-
-
-        // Avant le return du composant
-const tva_calcul = facture.lignes.reduce((acc, ligne) => {
-  const totalHT = ligne.quantite * ligne.nombre_jours * ligne.prix_unitaire;
-  const tvaMontant = totalHT * (ligne.tva / 100); // TVA de la ligne
-  return acc + tvaMontant;
-}, 0);
+  // Calcul de la TVA
+  const tva_calcul = facture.lignes.reduce((acc, ligne) => {
+    const totalHT = ligne.quantite * ligne.nombre_jours * ligne.prix_unitaire;
+    const tvaMontant = totalHT * (ligne.tva / 100);
+    return acc + tvaMontant;
+  }, 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -171,25 +171,10 @@ const tva_calcul = facture.lignes.reduce((acc, ligne) => {
         backPath={`/clients/${clientId}/vente`}
         actions={
           <div className="flex gap-2 flex-wrap">
-            <Dialog open={showFacturePrint} onOpenChange={setShowFacturePrint}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimer
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto bg-card">
-                <DialogHeader>
-                  <DialogTitle>Aperçu de la facture</DialogTitle>
-                </DialogHeader>
-                <FacturePrintView 
-                  facture={facture} 
-                  client={facture.client} 
-                  config={{}} 
-                  devisOrigine={facture.devis}
-                />
-              </DialogContent>
-            </Dialog>
+            <Button variant="outline" onClick={downloadFacturePDF}>
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimer Facture
+            </Button>
 
             <Button variant="outline" onClick={() => navigate(`/clients/${clientId}/factures/${factureId}/edit`)}>
               <Edit className="h-4 w-4 mr-2" />
@@ -316,59 +301,42 @@ const tva_calcul = facture.lignes.reduce((acc, ligne) => {
                       <th className="text-right p-3 font-medium text-foreground">Total HT</th>
                     </tr>
                   </thead>
-                 
-<tbody>
-  {facture.lignes.length === 0 && (
-    <tr>
-      <td colSpan={6} className="p-4 text-center text-muted-foreground">
-        Aucune ligne de facture
-      </td>
-    </tr>
-  )}
+                  <tbody>
+                    {facture.lignes.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-4 text-center text-muted-foreground">
+                          Aucune ligne de facture
+                        </td>
+                      </tr>
+                    )}
 
+                    {facture.lignes.map((ligne) => {
+                      const totalHT = ligne.quantite * ligne.nombre_jours * ligne.prix_unitaire;
 
-
-  {facture.lignes.map((ligne) => {
-    const totalHT =
-      ligne.quantite * ligne.nombre_jours * ligne.prix_unitaire;
-
-
-
-   
-
-    return (
-      <tr key={ligne.id} className="border-t border-border">
-        <td className="p-3 text-foreground">
-          {ligne.description}
-        </td>
-
-        <td className="p-3 text-center text-foreground">
-          {ligne.quantite}
-        </td>
-
-        <td className="p-3 text-center text-foreground">
-          {ligne.nombre_jours}
-        </td>
-
-        <td className="p-3 text-right text-foreground">
-          {formatCurrency(ligne.prix_unitaire)}
-        </td>
-
-        <td className="p-3 text-right text-foreground">
-          {ligne.tva}%
-        </td>
-
-        <td className="p-3 text-right font-medium text-foreground">
-          {formatCurrency(totalHT)}
-        </td>
-      </tr>
-    );
-  })}
-</tbody>
-
-
-
-                 
+                      return (
+                        <tr key={ligne.id} className="border-t border-border">
+                          <td className="p-3 text-foreground">
+                            {ligne.description}
+                          </td>
+                          <td className="p-3 text-center text-foreground">
+                            {ligne.quantite}
+                          </td>
+                          <td className="p-3 text-center text-foreground">
+                            {ligne.nombre_jours}
+                          </td>
+                          <td className="p-3 text-right text-foreground">
+                            {formatCurrency(ligne.prix_unitaire)}
+                          </td>
+                          <td className="p-3 text-right text-foreground">
+                            {ligne.tva}%
+                          </td>
+                          <td className="p-3 text-right font-medium text-foreground">
+                            {formatCurrency(totalHT)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -393,15 +361,11 @@ const tva_calcul = facture.lignes.reduce((acc, ligne) => {
                 </div>
               </div>
             </div>
-
           </CardContent>
         </Card>
 
-
-
-
         {/* Sidebar - Devis d'origine */}
-
+        {facture.devis && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -412,29 +376,18 @@ const tva_calcul = facture.lignes.reduce((acc, ligne) => {
               </CardHeader>
               <CardContent>
                 <button
-                  onClick={() => navigate(`/clients/${clientId}/devis/${facture.devis.id}`)}
+                  onClick={() => navigate(`/clients/${clientId}/devis/${facture.devis?.id}`)}
                   className="w-full text-left p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
                   <p className="font-mono font-medium text-foreground">{facture.devis.numero_devis}</p>
                   <p className="text-sm text-muted-foreground">
-                    {format(facture.devis.created_at, 'dd MMM yyyy', { locale: fr })}
+                    {formatDate(facture.devis.created_at)}
                   </p>
                 </button>
               </CardContent>
             </Card>
           </div>
-      
-
-
-
-
-
-
-
-
-
-
-
+        )}
       </div>
     </div>
   );

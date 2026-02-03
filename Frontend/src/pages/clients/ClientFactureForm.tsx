@@ -230,6 +230,7 @@ const ClientFactureForm: React.FC = () => {
           tva: l.tva,})),
         sous_total: Number(sousTotal.toFixed(2)),
         total_ttc: Number(totalTTC.toFixed(2)),
+        montant_tva: Number(montantTva.toFixed(2)),
       };
 
       let response: Response;

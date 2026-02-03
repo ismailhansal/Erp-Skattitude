@@ -98,15 +98,21 @@ public function factures($clientId, $devisId)
             'bon_commande' => $validated['bon_commande'] ?? null,
             'statut' => 'en_attente',
             'date_devis' => now(),
+            'montant_tva' => 0, // sera mis à jour plus tard
         ]);
 
         $sous_total = 0;
         $tva_total = 0;
 
+                foreach ($validated['lignes'] as $ligne) {
+
         // Créer les lignes
-        foreach ($validated['lignes'] as $ligne) {
-        $ligne_total = $ligne['quantite'] * $ligne['nombre_jours'] * $ligne['prix_unitaire'];
-        $ligne_tva = ($ligne_total * $ligne['tva']) / 100;
+$ligne_total = $ligne['quantite'] * $ligne['nombre_jours'] * $ligne['prix_unitaire'];
+$ligne_tva = ($ligne_total * $ligne['tva']) / 100;
+
+
+
+                
 
             $sous_total += $ligne_total;
             $tva_total += $ligne_tva;
@@ -123,11 +129,12 @@ public function factures($clientId, $devisId)
         }
 
         // Mettre à jour le total
-        $devis->update([
-            'sous_total' => $sous_total,
-            'tva' => $tva_total,
-            'total_ttc' => $sous_total + $tva_total,
-        ]);
+      $devis->update([
+    'sous_total' => $sous_total,
+    'montant_tva' => $tva_total,   // montant total de TVA
+    'total_ttc' => $sous_total + $tva_total,
+]);
+
 
         \DB::commit();
 
@@ -154,7 +161,7 @@ public function factures($clientId, $devisId)
         'condition_reglement' => $request->condition_reglement,
         'bon_commande' => $request->bon_commande,
         'sous_total' => $request->sous_total,
-        'tva' => $request->tva,
+        'montant_tva' => $request->montant_tva,
         'total_ttc' => $request->total_ttc,
     ]);
 

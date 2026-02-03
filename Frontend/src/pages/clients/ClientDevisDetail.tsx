@@ -113,7 +113,7 @@ const ClientDevisDetail: React.FC = () => {
           estFacture: d.statut === 'facturé',
           lignes: lignesConverties,
           sousTotal: Number(d.sous_total) || 0,
-          montantTva: Number(d.tva) || 0,
+          montantTva: Number(d.montant_tva) || 0,
           totalTTC: Number(d.total_ttc) || 0,
         });
 
@@ -218,7 +218,7 @@ const downloadDevisPDF = () => {
             <Dialog open={showDevisPrint} onOpenChange={setShowDevisPrint}>
               <Button variant="outline" onClick={downloadDevisPDF}>
   <Printer className="h-4 w-4 mr-2" />
-  Télécharger le devis (PDF)
+  Imprimer Devis
 </Button>
 
       <DialogContent className="max-w-full w-full p-0 overflow-auto bg-transparent print:max-w-full print:p-0">
@@ -353,7 +353,7 @@ const downloadDevisPDF = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">TVA</span>
-                  <span className="text-foreground">{formatCurrency(devis.tva)}</span>
+                  <span className="text-foreground">{formatCurrency(devis.montantTva)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">

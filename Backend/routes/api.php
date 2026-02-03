@@ -8,6 +8,8 @@ use App\Http\Controllers\FactureController;
 use App\Http\Controllers\BonLivraisonController;
 use App\Http\Controllers\EntrepriseController;
 use App\Http\Controllers\Pdf\DevisPdfController;
+use App\Http\Controllers\Pdf\FacturePdfController;
+
 
 
 // Exemple utilisateur authentifié (resté par défaut)
@@ -71,3 +73,6 @@ Route::delete('/entreprise/{id}', [EntrepriseController::class, 'destroy']);
 
 // Générer et télécharger le PDF d'un devis
 Route::get('/devis/{devis}/pdf', [DevisPdfController::class, 'download']);
+
+// Générer et télécharger le PDF d'une facture
+Route::get('/factures/{facture}/pdf', [FacturePdfController::class, 'download']);

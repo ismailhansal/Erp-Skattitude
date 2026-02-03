@@ -24,6 +24,7 @@ class Facture extends Model
         'sous_total',
         'total_ttc',
         'statut',
+        'montant_tva'
    
     ];
 
@@ -61,4 +62,9 @@ class Facture extends Model
     {
         return $this->hasMany(FactureLigne::class);
     }
+
+    public function entreprise()
+{
+    return $this->belongsTo(Entreprise::class);
+}
 }

@@ -13,7 +13,7 @@ class Devis extends Model
 
     protected $fillable = [
         'client_id', 'numero_devis','sous_total', 'total_ttc',
-        'condition_reglement', 'date_evenement', 'statut'
+        'condition_reglement', 'date_evenement', 'statut', 'montant_tva'
     ];
 
     public function client() {
@@ -32,7 +32,7 @@ class Devis extends Model
     public function bonLivraison() {
         return $this->hasOne(BonLivraison::class);
     }
-    
+
 public function entreprise()
 {
     return $this->belongsTo(Entreprise::class);
