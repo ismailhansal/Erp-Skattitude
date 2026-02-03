@@ -13,7 +13,7 @@ class Devis extends Model
 
     protected $fillable = [
         'client_id', 'numero_devis','sous_total', 'total_ttc',
-        'condition_reglement', 'date_evenement', 'statut', 'tva_applicable'
+        'condition_reglement', 'date_evenement', 'statut', 'montant_tva'
     ];
 
     public function client() {

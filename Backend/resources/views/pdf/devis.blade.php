@@ -232,7 +232,7 @@
         <tr>
             <td class="description-col">{{ $ligne->description }}</td>
             <td>{{ number_format($ligne->quantite, 0, ',', ' ') }}</td>
-            <td>{{ number_format($ligne->nombre_jours, 2, ',', ' ') }}</td>
+            <td>{{ number_format($ligne->nombre_jours, 0, ',', ' ') }}</td>
             <td>{{ number_format($ligne->prix_unitaire, 2, ',', ' ') }} MAD</td>
             <td>TVA 20% VENTES</td>
             <td class="price-col">{{ number_format($devis->sous_total, 2, ',', ' ') }} MAD</td>

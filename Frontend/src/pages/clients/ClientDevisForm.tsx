@@ -127,7 +127,7 @@ const ClientDevisForm: React.FC = () => {
           tva: l.tva,
         })),
         sous_total: sousTotal,
-        tva: montantTva,
+        montant_tva: montantTva,
         total_ttc: totalTTC,
       };
 

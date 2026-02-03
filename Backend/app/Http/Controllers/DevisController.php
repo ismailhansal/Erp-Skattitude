@@ -98,7 +98,6 @@ public function factures($clientId, $devisId)
             'bon_commande' => $validated['bon_commande'] ?? null,
             'statut' => 'en_attente',
             'date_devis' => now(),
-            'montant_tva' => 0, // sera mis à jour plus tard
         ]);
 
         $sous_total = 0;
@@ -116,6 +115,7 @@ $ligne_tva = ($ligne_total * $ligne['tva']) / 100;
 
             $sous_total += $ligne_total;
             $tva_total += $ligne_tva;
+            
 
             $devis->lignes()->create([
             'description' => $ligne['description'],
@@ -123,6 +123,8 @@ $ligne_tva = ($ligne_total * $ligne['tva']) / 100;
             'nombre_jours' => $ligne['nombre_jours'],
             'prix_unitaire' => $ligne['prix_unitaire'],
             'tva' => $ligne['tva'],
+            'montant_tva' => $tva_total,
+
         ]);
 
             

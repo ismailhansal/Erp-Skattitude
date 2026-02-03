@@ -8,17 +8,39 @@ use Illuminate\Http\Request;
 
 class EntrepriseController extends Controller
 {
-    // GET /api/entreprise - Récupérer la config
+    // GET /api/entreprise - Récupérer la config (un seul enregistrement)
     public function index()
     {
         $entreprise = Entreprise::first();
+        
+        // Si aucune entreprise n'existe, retourner un objet vide avec structure
+        if (!$entreprise) {
+            return response()->json([
+                'id' => null,
+                'nom' => '',
+                'logo' => null,
+                'adresse' => '',
+                'ville' => '',
+                'telephone_1' => '',
+                'telephone_2' => '',
+                'email' => '',
+                'ICE' => '',
+                'RC' => '',
+                'TVA' => '',
+                'patente' => '',
+                'CNSS' => '',
+                'RIB' => '',
+                'couleur_accent' => '#3b82f6',
+            ]);
+        }
+        
         return response()->json($entreprise);
     }
 
-    // POST /api/entreprise - Créer une nouvelle entreprise
+    // POST /api/entreprise - Créer ou mettre à jour l'entreprise (un seul enregistrement)
     public function store(Request $request)
     {
-        // Validation minimale
+        // Validation
         $data = $request->validate([
             'nom' => 'required|string',
             'logo' => 'nullable|string',
@@ -33,13 +55,24 @@ class EntrepriseController extends Controller
             'patente' => 'nullable|string',
             'CNSS' => 'nullable|string',
             'RIB' => 'nullable|string',
+            'couleur_accent' => 'nullable|string',
         ]);
 
-        $entreprise = Entreprise::create($data);
-        return response()->json($entreprise, 201);
+        // Vérifier si une entreprise existe déjà
+        $entreprise = Entreprise::first();
+        
+        if ($entreprise) {
+            // Si elle existe, la mettre à jour
+            $entreprise->update($data);
+            return response()->json($entreprise, 200);
+        } else {
+            // Sinon, créer une nouvelle entreprise
+            $entreprise = Entreprise::create($data);
+            return response()->json($entreprise, 201);
+        }
     }
 
-    // PUT /api/entreprise/{id} - Mettre à jour une entreprise
+    // PUT /api/entreprise/{id} - Mettre à jour l'entreprise
     public function update(Request $request, $id)
     {
         $entreprise = Entreprise::findOrFail($id);
@@ -58,13 +91,14 @@ class EntrepriseController extends Controller
             'patente' => 'nullable|string',
             'CNSS' => 'nullable|string',
             'RIB' => 'nullable|string',
+            'couleur_accent' => 'nullable|string',
         ]);
 
         $entreprise->update($data);
         return response()->json($entreprise);
     }
 
-    // DELETE /api/entreprise/{id} - Supprimer une entreprise
+    // DELETE /api/entreprise/{id} - Supprimer l'entreprise
     public function destroy($id)
     {
         $entreprise = Entreprise::findOrFail($id);

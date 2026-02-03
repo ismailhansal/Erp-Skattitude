@@ -127,7 +127,7 @@ class FactureController extends Controller
                 }
 
                 // 7. Mettre à jour le statut du devis
-                $devis->update(['statut' => 'payé']);
+                $devis->update(['statut' => 'facturé']);
 
                 DB::commit();
 
