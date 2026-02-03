@@ -17,6 +17,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DevisPrintView } from '@/components/documents/DevisPrintView';
 import { BonLivraisonPrintView } from '@/components/documents/BonLivraisonPrintView';
 
+
+
+
+
+
+
 // Fonction utilitaire pour parser les dates en toute sécurité
 const parseSafeDate = (dateString: any): Date | null => {
   if (!dateString) return null;
@@ -177,7 +183,12 @@ const ClientDevisDetail: React.FC = () => {
     return 'pending';
   };
 
-
+const downloadDevisPDF = () => {
+  window.open(
+    `http://127.0.0.1:8000/api/devis/${devisId}/pdf`,
+    '_blank'
+  );
+};
 
 
   return (
@@ -205,18 +216,16 @@ const ClientDevisDetail: React.FC = () => {
             </Dialog>
 
             <Dialog open={showDevisPrint} onOpenChange={setShowDevisPrint}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimer
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto bg-card">
-                <DialogHeader>
-                  <DialogTitle>Aperçu du devis</DialogTitle>
-                </DialogHeader>
-                <DevisPrintView devis={devis} client={client} />
-              </DialogContent>
+              <Button variant="outline" onClick={downloadDevisPDF}>
+  <Printer className="h-4 w-4 mr-2" />
+  Télécharger le devis (PDF)
+</Button>
+
+      <DialogContent className="max-w-full w-full p-0 overflow-auto bg-transparent print:max-w-full print:p-0">
+  <DevisPrintView devis={devis} client={client} />
+</DialogContent>
+
+
             </Dialog>
 
             <Button 

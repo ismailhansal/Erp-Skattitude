@@ -32,6 +32,12 @@ class Devis extends Model
     public function bonLivraison() {
         return $this->hasOne(BonLivraison::class);
     }
+    
+public function entreprise()
+{
+    return $this->belongsTo(Entreprise::class);
+}
+
 
 
 // Numéro automatique et date par défaut

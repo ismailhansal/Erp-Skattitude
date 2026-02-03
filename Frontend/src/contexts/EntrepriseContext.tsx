@@ -6,8 +6,8 @@ export interface ConfigurationEntreprise {
   nomEntreprise: string;
   adresse: string;
   ville: string;
-  telephone1: string;
-  telephone2?: string;
+  telephone_1: string;
+  telephone_2: string;
   email: string;
   logo?: string;
   mentionsLegales?: string;
@@ -29,7 +29,7 @@ export const EntrepriseProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const fetchConfig = async () => {
     try {
-      const response = await axios.get<ConfigurationEntreprise>("/api/entreprise");
+      const response = await axios.get<ConfigurationEntreprise>("http://127.0.0.1:8000/api/entreprise");
       setConfig(response.data);
     } catch (error) {
       console.error("Erreur lors du chargement de la configuration entreprise:", error);

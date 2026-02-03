@@ -7,6 +7,8 @@ use App\Http\Controllers\DevisController;
 use App\Http\Controllers\FactureController;
 use App\Http\Controllers\BonLivraisonController;
 use App\Http\Controllers\EntrepriseController;
+use App\Http\Controllers\Pdf\DevisPdfController;
+
 
 // Exemple utilisateur authentifié (resté par défaut)
 Route::get('/user', function (Request $request) {
@@ -66,3 +68,6 @@ Route::get('/entreprise', [EntrepriseController::class, 'index']); // Récupére
 Route::post('/entreprise', [EntrepriseController::class, 'store']); // Créer
 Route::put('/entreprise/{id}', [EntrepriseController::class, 'update']); // Mettre à jour
 Route::delete('/entreprise/{id}', [EntrepriseController::class, 'destroy']);
+
+// Générer et télécharger le PDF d'un devis
+Route::get('/devis/{devis}/pdf', [DevisPdfController::class, 'download']);
