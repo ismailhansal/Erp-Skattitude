@@ -16,8 +16,9 @@ import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { format, isAfter, isBefore } from 'date-fns';
+import { format, isAfter, isBefore, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Client {
   id: number;
@@ -29,6 +30,7 @@ interface Facture {
   client_id: number;
   numero_facture: string;
   date_echeance: string;
+  date_facture: string;
   total_ttc: number;
   statut: string;
   client?: Client;
@@ -105,6 +107,35 @@ const Dashboard: React.FC = () => {
     .filter((f) => f.statut === 'payé')
     .reduce((acc, f) => acc + Number(f.total_ttc), 0);
 
+  // 📊 CALCUL DU CA PAR MOIS (6 derniers mois)
+  const getLast6MonthsCA = () => {
+    const months = [];
+    
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = subMonths(today, i);
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      
+      const monthCA = factures
+        .filter((f) => {
+          if (f.statut !== 'payé') return false;
+          const factureDate = new Date(f.date_facture);
+          return factureDate >= monthStart && factureDate <= monthEnd;
+        })
+        .reduce((acc, f) => acc + Number(f.total_ttc), 0);
+      
+      months.push({
+        mois: format(monthDate, 'MMM yyyy', { locale: fr }),
+        ca: monthCA,
+        isCurrentMonth: i === 0,
+      });
+    }
+    
+    return months;
+  };
+
+  const caData = getLast6MonthsCA();
+
   // Factures du mois en cours
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
@@ -124,6 +155,21 @@ const Dashboard: React.FC = () => {
       style: 'currency',
       currency: 'MAD',
     }).format(amount);
+  };
+
+  
+
+  // Custom Tooltip pour le graphique
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-card border border-border rounded-lg shadow-lg p-3">
+          <p className="text-sm font-medium text-foreground">{payload[0].payload.mois}</p>
+          <p className="text-lg font-bold text-primary">{formatCurrency(payload[0].value)}</p>
+        </div>
+      );
+    }
+    return null;
   };
 
   // Colonnes Factures
@@ -199,7 +245,6 @@ const Dashboard: React.FC = () => {
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                // TODO: Implémenter la relance
                 alert(`Relance pour la facture ${item.numero_facture}`);
               }}
               className="text-primary hover:text-primary"
@@ -328,7 +373,8 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Alerts for overdue items */}
+
+            {/* Alerts for overdue items */}
       {devisEnRetard.length > 0 && (
         <Card className="border-destructive/50 bg-destructive/5">
           <CardContent className="flex items-center gap-4 py-4">
@@ -348,6 +394,42 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* 📊 GRAPHIQUE CA 6 MOIS */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Évolution du CA sur 6 mois
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={caData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis 
+                dataKey="mois" 
+                className="text-xs text-muted-foreground"
+                tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              />
+              <YAxis 
+                className="text-xs text-muted-foreground"
+                tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar 
+                dataKey="ca" 
+                fill="hsl(var(--primary))"
+                radius={[8, 8, 0, 0]}
+                className="fill-primary"
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+
 
       {/* Tables */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">

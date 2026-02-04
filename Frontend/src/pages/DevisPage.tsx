@@ -77,13 +77,35 @@ const DevisPage: React.FC = () => {
     fetchDevis();
   }, []);
 
-  const handleDelete = (devis: Devis) => {
-    setDevisList(prev => prev.filter(d => d.id !== devis.id));
-    toast({
-      title: 'Devis supprimé',
-      description: `Le devis ${devis.numero} a été supprimé.`,
-      variant: 'destructive',
-    });
+  // Fonction pour supprimer un devis
+  const handleDeleteDevis = async (devis: Devis & { client: Client }) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce devis ?')) {
+      return;
+    }
+
+    try {
+      console.log(`🗑️ Suppression du devis ${devis.id} pour le client ${devis.clientId}`);
+      
+      await axios.delete(`http://127.0.0.1:8000/api/clients/${devis.clientId}/devis/${devis.id}`);
+      
+      // Mettre à jour la liste locale
+      setDevisList(prev => prev.filter(d => d.id !== devis.id));
+      
+      console.log('✅ Devis supprimé avec succès');
+      toast({
+        title: 'Devis supprimé',
+        description: 'Le devis a été supprimé avec succès.',
+        variant: 'destructive',
+      });
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la suppression:', err);
+      console.error('Réponse serveur:', err.response?.data);
+      toast({
+        title: 'Erreur',
+        description: err.response?.data?.message || 'Erreur lors de la suppression du devis',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Ajoute info client à chaque devis
@@ -149,6 +171,7 @@ const DevisPage: React.FC = () => {
       key: 'status',
       header: 'Statut',
       render: (item: Devis) => {
+        if (!item.dateEvenement) return <StatusBadge variant="pending" />;
         const isPast = isBefore(item.dateEvenement, today);
         if (item.estFacture) return <StatusBadge variant="invoiced" />;
         if (isPast) return <StatusBadge variant="toInvoice" />;
@@ -167,22 +190,31 @@ const DevisPage: React.FC = () => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/devis/${item.id}`)}>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/clients/${item.clientId}/devis/${item.id}`);
+              }}
+            >
               <Eye className="h-4 w-4 mr-2" />
               Voir
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate(`/devis/${item.id}/edit`)}>
+
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/clients/${item.clientId}/devis/${item.id}/edit`);
+              }}
+            >
               <Edit className="h-4 w-4 mr-2" />
               Modifier
             </DropdownMenuItem>
-            {!item.estFacture && (
-              <DropdownMenuItem onClick={() => navigate(`/devis/${item.id}/facturer`)}>
-                <Receipt className="h-4 w-4 mr-2" />
-                Créer facture
-              </DropdownMenuItem>
-            )}
+
             <DropdownMenuItem
-              onClick={() => handleDelete(item)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteDevis(item);
+              }}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -229,7 +261,7 @@ const DevisPage: React.FC = () => {
       <DataTable
         data={filteredDevis}
         columns={columns}
-        onRowClick={(item) => navigate(`/devis/${item.id}`)}
+        onRowClick={(item) => navigate(`/clients/${item.clientId}/devis/${item.id}`)}
         emptyMessage="Aucun devis trouvé"
       />
     </div>

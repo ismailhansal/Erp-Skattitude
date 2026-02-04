@@ -17,7 +17,7 @@ interface LigneDocument {
   description: string;
   quantite: number;
   nombreJours: number;
-  prixUnitaire: number;
+  prixUnitaire: number | '';
   tva: number;
 }
 
@@ -87,7 +87,7 @@ const ClientFactureForm: React.FC = () => {
   const [dateEcheance, setDateEcheance] = useState('');
   const [conditionReglement, setConditionReglement] = useState('30 jours fin de mois');
   const [lignes, setLignes] = useState<LigneDocument[]>([
-    { description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }
+    { description: '', quantite: 1, nombreJours: 1, prixUnitaire: '', tva: 20 }
   ]);
 
   // Calcul date d'échéance
@@ -386,13 +386,20 @@ const ClientFactureForm: React.FC = () => {
                       </div>
                       <div className="space-y-2">
                         <Label>Prix unitaire (MAD)</Label>
-                        <Input
+                      <Input
                           type="number"
                           min="0"
                           step="0.01"
-                          value={ligne.prixUnitaire}
-                          onChange={(e) => updateLigne(index, 'prixUnitaire', parseFloat(e.target.value) || 0)}
+                          value={ligne.prixUnitaire ?? ""}
+                          onChange={(e) =>
+                            updateLigne(
+                              index,
+                              'prixUnitaire',
+                              e.target.value === "" ? "" : parseFloat(e.target.value)
+                            )
+                          }
                         />
+
                       </div>
                       <div className="space-y-2">
                         <Label>TVA</Label>

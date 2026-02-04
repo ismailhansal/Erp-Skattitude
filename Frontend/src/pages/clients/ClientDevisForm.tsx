@@ -27,7 +27,7 @@ const ClientDevisForm: React.FC = () => {
   const [bonCommande, setBonCommande] = useState('');
 
   const [lignes, setLignes] = useState<Omit<LigneDocument, 'id'>[]>([
-    { description: '', quantiteHotesses: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 },
+    { description: '', quantiteHotesses: 1, nombreJours: 1, prixUnitaire: '', tva: 20 },
   ]);
 
   /* ================= CLIENT ================= */
@@ -267,11 +267,16 @@ const ClientDevisForm: React.FC = () => {
             <Label>Prix unitaire (MAD)</Label>
             <Input
               type="number"
-              min="0"
-              step="0.01"
-              value={ligne.prixUnitaire}
-              onChange={(e) => updateLigne(index, 'prixUnitaire', parseFloat(e.target.value) || 0)}
+              value={ligne.prixUnitaire ?? ""}
+              onChange={(e) =>
+                updateLigne(
+                  index,
+                  'prixUnitaire',
+                  e.target.value === "" ? "" : parseFloat(e.target.value)
+                )
+              }
             />
+
           </div>
           <div className="space-y-2">
             <Label>TVA</Label>

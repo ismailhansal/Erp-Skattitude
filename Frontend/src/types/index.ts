@@ -18,7 +18,8 @@ export interface LigneDocument {
   description: string;
   quantiteHotesses: number;
   nombreJours: number;
-  prixUnitaire: number;
+  prixUnitaire: number | ''
+
   tva: number; // 0 or 20
 }
 
