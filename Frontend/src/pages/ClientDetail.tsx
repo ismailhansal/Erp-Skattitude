@@ -174,7 +174,7 @@ const ClientDetail: React.FC = () => {
     );
 
   const totalCA = factures
-    .filter(f => f.estPayee || f.statut === 'payé')
+    .filter(f => f.estPayee)
     .reduce((acc, f) => acc + f.totalTTC, 0);
 
   const formatCurrency = (amount: number) =>

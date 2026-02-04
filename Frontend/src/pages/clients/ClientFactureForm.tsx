@@ -213,7 +213,9 @@ const ClientFactureForm: React.FC = () => {
     e.preventDefault();
     if (!dateFacture) return toast({ title: 'Erreur', description: 'Veuillez saisir la date de facture.', variant: 'destructive' });
 
-    const invalidLigne = lignes.find(l => !l.description.trim() || l.prixUnitaire <= 0);
+const invalidLigne = lignes.find(
+  l => !l.description.trim() || (Number(l.prixUnitaire) || 0) <= 0
+);
     if (invalidLigne) return toast({ title: 'Erreur', description: 'Chaque ligne doit avoir une description et un prix > 0.', variant: 'destructive' });
 
     setIsSaving(true);

@@ -80,7 +80,10 @@ const ClientDevisForm: React.FC = () => {
     let montantTva = 0;
 
     lignes.forEach(l => {
-      const total = l.quantiteHotesses * l.nombreJours * l.prixUnitaire;
+const total =
+  (Number(l.quantiteHotesses) || 0) *
+  (Number(l.nombreJours) || 0) *
+  (Number(l.prixUnitaire) || 0);
       sousTotal += total;
       montantTva += (total * l.tva) / 100;
     });
@@ -298,7 +301,11 @@ const ClientDevisForm: React.FC = () => {
         <div className="text-right">
           <span className="text-sm text-muted-foreground">Total ligne: </span>
           <span className="font-semibold text-foreground">
-            {formatCurrency(ligne.quantiteHotesses * ligne.nombreJours * ligne.prixUnitaire)}
+{formatCurrency(
+  (Number(ligne.quantiteHotesses) || 0) *
+  (Number(ligne.nombreJours) || 0) *
+  (Number(ligne.prixUnitaire) || 0)
+)}
           </span>
         </div>
       </div>

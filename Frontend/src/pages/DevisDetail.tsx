@@ -121,7 +121,6 @@ const DevisDetail: React.FC = () => {
               </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto bg-card">
                 <DialogHeader><DialogTitle>Bon de livraison</DialogTitle></DialogHeader>
-                <BonLivraisonPrintView devis={devis} client={client} />
               </DialogContent>
             </Dialog>
 
