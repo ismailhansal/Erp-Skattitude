@@ -8,6 +8,6 @@ class Entreprise extends Model
 {
     protected $fillable = [
         'nom', 'logo', 'adresse', 'ville', 'telephone_1', 'telephone_2',
-        'email', 'ICE', 'RC', 'TVA', 'patente', 'CNSS', 'RIB'
+        'email', 'ICE', 'RC', 'TVA', 'patente', 'CNSS', 'RIB', "couleur_accent"
     ];
 }

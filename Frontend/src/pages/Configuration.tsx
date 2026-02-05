@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { entrepriseService, EntrepriseData } from '@/services/entrepriseService';
+import { useEntrepriseContext } from '@/contexts/EntrepriseContext';
+import api from '@/lib/axios';
 import logo from '@/assets/logo.png';
 
 interface ConfigState {
@@ -31,6 +32,8 @@ interface ConfigState {
 
 const Configuration: React.FC = () => {
   const { toast } = useToast();
+  const { config: entrepriseConfig, loading: loadingContext, reloadConfig } = useEntrepriseContext();
+  
   const [config, setConfig] = useState<ConfigState>({
     nomEntreprise: '',
     adresse: '',
@@ -45,57 +48,39 @@ const Configuration: React.FC = () => {
     cnss: '',
     rib: '',
     mentionsLegales: '',
-    couleurAccent: '#3b82f6',
+    couleurAccent: '#a06464',
   });
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Charger les données au montage du composant
+  // Charger les données depuis le contexte
   useEffect(() => {
-    loadConfiguration();
-  }, []);
-
-  const loadConfiguration = async () => {
-    try {
-      setLoading(true);
-      const data = await entrepriseService.getConfiguration();
-      
-      // Mapper les données du backend vers le state frontend
+    if (entrepriseConfig) {
       setConfig({
-        id: data.id,
-        nomEntreprise: data.nom || '',
-        adresse: data.adresse || '',
-        ville: data.ville || '',
-        telephone1: data.telephone_1 || '',
-        telephone2: data.telephone_2 || '',
-        email: data.email || '',
-        ice: data.ICE || '',
-        rc: data.RC || '',
-        numeroTva: data.TVA || '',
-        patente: data.patente || '',
-        cnss: data.CNSS || '',
-        rib: data.RIB || '',
-        mentionsLegales: '',
-        couleurAccent: data.couleur_accent || '#3b82f6',
+        id: entrepriseConfig.id,
+        nomEntreprise: entrepriseConfig.nom || '',
+        adresse: entrepriseConfig.adresse || '',
+        ville: entrepriseConfig.ville || '',
+        telephone1: entrepriseConfig.telephone_1 || '',
+        telephone2: entrepriseConfig.telephone_2 || '',
+        email: entrepriseConfig.email || '',
+        ice: entrepriseConfig.ICE || '',
+        rc: entrepriseConfig.RC || '',
+        numeroTva: entrepriseConfig.TVA || '',
+        patente: entrepriseConfig.patente || '',
+        cnss: entrepriseConfig.CNSS || '',
+        rib: entrepriseConfig.RIB || '',
+        mentionsLegales: entrepriseConfig.mentions_legales || '',
+        couleurAccent: entrepriseConfig.couleur_accent || '#a06464',
       });
-    } catch (error) {
-      console.error('Erreur lors du chargement de la configuration:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de charger la configuration de l\'entreprise.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [entrepriseConfig]);
 
   const handleSave = async () => {
     try {
       setSaving(true);
 
-      // Mapper les données du frontend vers le format backend
-      const dataToSave: Partial<EntrepriseData> = {
+      // Mapper les données frontend → backend
+      const dataToSave = {
         nom: config.nomEntreprise,
         adresse: config.adresse,
         ville: config.ville,
@@ -108,26 +93,31 @@ const Configuration: React.FC = () => {
         patente: config.patente,
         CNSS: config.cnss,
         RIB: config.rib,
+        mentions_legales: config.mentionsLegales,
         couleur_accent: config.couleurAccent,
       };
 
-      // Le backend gère automatiquement la création ou mise à jour
-      const result = await entrepriseService.saveEntreprise(dataToSave);
-      
-      // Mettre à jour l'ID si c'était une création
-      if (result.id && !config.id) {
-        setConfig(prev => ({ ...prev, id: result.id }));
+      if (config.id) {
+        // Mise à jour
+        await api.put(`/api/entreprise/${config.id}`, dataToSave);
+      } else {
+        // Création
+        const response = await api.post('/api/entreprise', dataToSave);
+        setConfig(prev => ({ ...prev, id: response.data.id }));
       }
+
+      // Recharger la config dans le contexte (va appliquer la couleur automatiquement)
+      await reloadConfig();
 
       toast({
         title: 'Configuration enregistrée',
         description: 'Vos paramètres ont été sauvegardés avec succès.',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la sauvegarde:', error);
       toast({
         title: 'Erreur',
-        description: 'Impossible de sauvegarder la configuration.',
+        description: error.response?.data?.message || 'Impossible de sauvegarder la configuration.',
         variant: 'destructive',
       });
     } finally {
@@ -137,9 +127,43 @@ const Configuration: React.FC = () => {
 
   const handleChange = (field: keyof ConfigState, value: string) => {
     setConfig((prev) => ({ ...prev, [field]: value }));
+
+    // Aperçu en temps réel de la couleur (sans sauvegarder)
+    if (field === 'couleurAccent') {
+      // Conversion HEX → HSL pour Tailwind
+      const hexToHSL = (hex: string): string => {
+        hex = hex.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16) / 255;
+        const g = parseInt(hex.substring(2, 4), 16) / 255;
+        const b = parseInt(hex.substring(4, 6), 16) / 255;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        let h = 0, s = 0, l = (max + min) / 2;
+        if (max !== min) {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          switch (max) {
+            case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+            case g: h = ((b - r) / d + 2) / 6; break;
+            case b: h = ((r - g) / d + 4) / 6; break;
+          }
+        }
+        h = Math.round(h * 360);
+        s = Math.round(s * 100);
+        l = Math.round(l * 100);
+        return `${h} ${s}% ${l}%`;
+      };
+
+      try {
+        const hsl = hexToHSL(value);
+        document.documentElement.style.setProperty('--primary', hsl);
+      } catch (error) {
+        console.error('Erreur conversion couleur:', error);
+      }
+    }
   };
 
-  if (loading) {
+  if (loadingContext) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -353,17 +377,17 @@ const Configuration: React.FC = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="apparence">
+       <TabsContent value="apparence">
           <Card>
             <CardHeader>
               <CardTitle>Personnalisation</CardTitle>
               <CardDescription>
-                Personnalisez l'apparence de vos documents
+                Personnalisez l'apparence de votre application et de vos documents
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="couleurAccent">Couleur d'accentuation</Label>
+                <Label htmlFor="couleurAccent">Couleur principale</Label>
                 <div className="flex items-center gap-4">
                   <Input
                     id="couleurAccent"
@@ -376,12 +400,29 @@ const Configuration: React.FC = () => {
                     value={config.couleurAccent}
                     onChange={(e) => handleChange('couleurAccent', e.target.value)}
                     className="w-32 font-mono"
+                    placeholder="#a06464"
                   />
                   <div
                     className="w-10 h-10 rounded-lg border"
                     style={{ backgroundColor: config.couleurAccent }}
                   />
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  Cette couleur sera appliquée aux boutons, liens et éléments interactifs
+                </p>
+              </div>
+
+              {/* Aperçu */}
+              <div className="p-4 border rounded-lg space-y-4 bg-muted/30">
+                <p className="font-semibold">Aperçu :</p>
+                <div className="space-x-2">
+                  <Button>Bouton principal</Button>
+                  <Button variant="outline">Bouton secondaire</Button>
+                  <Button variant="ghost">Bouton tertiaire</Button>
+                </div>
+                <p>
+                  Exemple de <span className="text-primary font-semibold">texte coloré</span> avec la couleur principale.
+                </p>
               </div>
             </CardContent>
           </Card>

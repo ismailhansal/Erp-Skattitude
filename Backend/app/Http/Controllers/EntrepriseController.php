@@ -30,7 +30,7 @@ class EntrepriseController extends Controller
                 'patente' => '',
                 'CNSS' => '',
                 'RIB' => '',
-                'couleur_accent' => '#3b82f6',
+                'couleur_accent' => '#a06464',
             ]);
         }
         
