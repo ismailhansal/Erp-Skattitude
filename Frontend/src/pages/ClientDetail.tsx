@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '@/lib/axios'; // ← Votre instance configurée
 import { 
   Building2, MapPin, Phone, Mail, FileText, Receipt, Plus, ExternalLink 
 } from 'lucide-react';
@@ -34,8 +34,8 @@ const ClientDetail: React.FC = () => {
     const fetchClientData = async () => {
       try {
         // 1️⃣ Client
-        const clientRes = await axios.get<Client>(
-          `http://127.0.0.1:8000/api/clients/${clientId}`
+        const clientRes = await api.get<Client>(
+          `/api/clients/${clientId}`
         );
 
         setClient({
@@ -44,8 +44,8 @@ const ClientDetail: React.FC = () => {
         });
 
         // 2️⃣ Devis
-        const devisRes = await axios.get<any[]>(
-          `http://127.0.0.1:8000/api/clients/${clientId}/devis`
+        const devisRes = await api.get<any[]>(
+          `/api/clients/${clientId}/devis`
         );
 
         setDevis(
@@ -77,8 +77,8 @@ const ClientDetail: React.FC = () => {
         );
 
         // 3️⃣ Factures
-        const facturesRes = await axios.get<any[]>(
-          `http://127.0.0.1:8000/api/clients/${clientId}/factures`
+        const facturesRes = await api.get<any[]>(
+          `/api/clients/${clientId}/factures`
         );
 
         setFactures(
@@ -128,7 +128,7 @@ const ClientDetail: React.FC = () => {
     try {
       console.log(`🗑️ Suppression du devis ${devisId} pour le client ${clientId}`);
       
-      await axios.delete(`http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}`);
+      await api.delete(`/api/clients/${clientId}/devis/${devisId}`);
       
       // Mettre à jour la liste locale
       setDevis(prev => prev.filter(d => d.id !== devisId));
@@ -151,7 +151,7 @@ const ClientDetail: React.FC = () => {
     try {
       console.log(`🗑️ Suppression de la facture ${factureId} pour le client ${clientId}`);
       
-      await axios.delete(`http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`);
+      await api.delete(`/api/clients/${clientId}/factures/${factureId}`);
       
       // Mettre à jour la liste locale
       setFactures(prev => prev.filter(f => f.id !== factureId));

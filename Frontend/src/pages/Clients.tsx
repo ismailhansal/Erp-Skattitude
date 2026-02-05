@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/axios'; // ← Votre instance configurée
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
@@ -42,8 +42,8 @@ const [clients, setClients] = useState<Client[]>([]);
 const [loading, setLoading] = useState<boolean>(true);
 
 useEffect(() => {
-  axios
-    .get<Client[]>("http://127.0.0.1:8000/api/clients")
+  api
+    .get<Client[]>("/api/clients")
     .then((res) => {
       // Transformer id en string pour DataTable
       const mapped = res.data.map((c) => ({
@@ -117,8 +117,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   try {
     if (editingClient) {
       // 🔁 UPDATE
-      const res = await axios.put<Client>(
-        `http://127.0.0.1:8000/api/clients/${editingClient.id}`,
+      const res = await api.put<Client>(
+        `/api/clients/${editingClient.id}`,
         formData
       );
 
@@ -132,8 +132,8 @@ const handleSubmit = async (e: React.FormEvent) => {
       });
     } else {
       // ➕ CREATE
-      const res = await axios.post<Client>(
-        "http://127.0.0.1:8000/api/clients",
+      const res = await api.post<Client>(
+        "/api/clients",
         formData
       );
 
@@ -155,7 +155,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   const handleDelete = async (client: Client) => {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/clients/${client.id}`);
+        await api.delete(`/api/clients/${client.id}`);
         setClients(prev => prev.filter(c => c.id !== client.id));
         toast({
           title: 'Client supprimé',

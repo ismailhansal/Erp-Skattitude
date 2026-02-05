@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Save } from 'lucide-react';
+import api from '@/lib/axios'; // ← Votre instance configurée
+
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,9 +34,8 @@ const ClientDevisForm: React.FC = () => {
 
   /* ================= CLIENT ================= */
   useEffect(() => {
-    fetch(`http://127.0.0.1:8000/api/clients/${clientId}`)
-      .then(res => res.json())
-      .then(setClient)
+ api.get(`/api/clients/${clientId}`)
+  .then(res => setClient(res.data))
       .catch(() =>
         toast({
           title: 'Erreur',
@@ -48,9 +49,9 @@ const ClientDevisForm: React.FC = () => {
   useEffect(() => {
     if (!isEdit) return;
 
-    fetch(`http://127.0.0.1:8000/api/devis/${devisId}`)
-      .then(res => res.json())
-      .then(data => {
+  api.get(`/api/devis/${devisId}`)
+      .then(res => {
+        const data = res.data;
         setDateEvenement(data.date_evenement);
         setConditionReglement(data.condition_reglement);
         setBonCommande(data.bon_commande || '');
@@ -113,49 +114,51 @@ const total =
 
   /* ================= SUBMIT ================= */
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  e.preventDefault();
+  setIsLoading(true);
 
-    try {
-      const payload = {
-        client_id: clientId,
-        date_evenement: dateEvenement,
-        condition_reglement: conditionReglement,
-        bon_commande: bonCommande,
-        lignes: lignes.map(l => ({
-          description: l.description,
-          quantite: l.quantiteHotesses,
-          nombre_jours: l.nombreJours,
-          prix_unitaire: l.prixUnitaire,
-          tva: l.tva,
-        })),
-        sous_total: sousTotal,
-        montant_tva: montantTva,
-        total_ttc: totalTTC,
-      };
+  try {
+    const payload = {
+      client_id: clientId,
+      date_evenement: dateEvenement,
+      condition_reglement: conditionReglement,
+      bon_commande: bonCommande,
+      lignes: lignes.map(l => ({
+        description: l.description,
+        quantite: l.quantiteHotesses,
+        nombre_jours: l.nombreJours,
+        prix_unitaire: l.prixUnitaire,
+        tva: l.tva,
+      })),
+      sous_total: sousTotal,
+      montant_tva: montantTva,
+      total_ttc: totalTTC,
+    };
 
-      const url = isEdit
-        ? `http://127.0.0.1:8000/api/devis/${devisId}`
-        : `http://127.0.0.1:8000/api/clients/${clientId}/devis`;
-
-      await fetch(url, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      toast({
-        title: isEdit ? 'Devis modifié' : 'Devis créé',
-        description: 'Opération réussie',
-      });
-
-      navigate(getBackPath());
-    } catch {
-      toast({ title: 'Erreur', description: 'Erreur lors de la sauvegarde', variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
+    if (isEdit) {
+      await api.put(`/api/devis/${devisId}`, payload);
+    } else {
+      await api.post(`/api/clients/${clientId}/devis`, payload);
     }
-  };
+
+    toast({
+      title: isEdit ? 'Devis modifié' : 'Devis créé',
+      description: 'Opération réussie',
+    });
+
+    navigate(getBackPath());
+
+  } catch {
+    toast({
+      title: 'Erreur',
+      description: 'Erreur lors de la sauvegarde',
+      variant: 'destructive'
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   if (!client) return null;
 

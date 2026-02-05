@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import axios from "axios";
 
+import { useAuth } from './AuthContext';
+
 export interface ConfigurationEntreprise {
   nomEntreprise: string;
   adresse: string;

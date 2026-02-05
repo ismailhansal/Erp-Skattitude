@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import axios from 'axios';
+import api from '@/lib/axios';
 import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Facture, Client } from '@/types';
@@ -23,37 +23,56 @@ const FacturesPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
-  const [factures, setFactures] = useState<Facture[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [facturesList, setFacturesList] = useState<Facture[]>([]);
+  const [clientsMap, setClientsMap] = useState<Record<number, Client>>({});
   const [loading, setLoading] = useState(true);
   const today = new Date();
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount);
 
+  // Fetch toutes les factures + clients
   useEffect(() => {
     const fetchFactures = async () => {
       try {
-        // Récupération de toutes les factures
-        const facturesRes = await axios.get<Facture[]>('http://127.0.0.1:8000/api/factures');
-        // Récupération de tous les clients
-        const clientsRes = await axios.get<Client[]>('http://127.0.0.1:8000/api/clients');
+        const facturesRes = await api.get<any[]>('/api/factures');
+        const clientsIds = Array.from(new Set(facturesRes.data.map(f => f.client_id)));
+        
+        // Fetch info clients
+        const clientsMapTemp: Record<number, Client> = {};
+        await Promise.all(clientsIds.map(async (id) => {
+          const res = await api.get<Client>(`/api/clients/${id}`);
+          clientsMapTemp[id] = {
+            ...res.data,
+            id: Number(res.data.id),
+          };
+        }));
 
-        setFactures(
+        setClientsMap(clientsMapTemp);
+
+        // Map factures
+        setFacturesList(
           facturesRes.data.map(f => ({
             ...f,
             id: f.id.toString(),
-            totalTTC: Number(f.total_ttc),
+            clientId: f.client_id,
+            numero: f.numero_facture,
+            totalTTC: Number(f.total_ttc) || 0,
             estPayee: f.statut === 'payé',
             dateFacturation: f.created_at ? new Date(f.created_at) : null,
             dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
+            statut: f.statut,
           }))
         );
 
-        setClients(clientsRes.data.map(c => ({ ...c, id: c.id.toString() })));
         setLoading(false);
       } catch (err) {
         console.error(err);
+        toast({ 
+          title: 'Erreur', 
+          description: 'Impossible de charger les factures', 
+          variant: 'destructive' 
+        });
         setLoading(false);
       }
     };
@@ -61,41 +80,97 @@ const FacturesPage: React.FC = () => {
     fetchFactures();
   }, []);
 
-  const getClientById = (id: number | string) => clients.find(c => c.id === String(id));
+  // Fonction pour supprimer une facture
+  const handleDeleteFacture = async (facture: Facture & { client: Client }) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette facture ?')) {
+      return;
+    }
 
-  const facturesWithClient = factures.map(f => ({
+    try {
+      console.log(`🗑️ Suppression de la facture ${facture.id} pour le client ${facture.clientId}`);
+      
+      await api.delete(`/api/clients/${facture.clientId}/factures/${facture.id}`);
+      
+      // Mettre à jour la liste locale
+      setFacturesList(prev => prev.filter(f => f.id !== facture.id));
+      
+      console.log('✅ Facture supprimée avec succès');
+      toast({
+        title: 'Facture supprimée',
+        description: 'La facture a été supprimée avec succès.',
+        variant: 'destructive',
+      });
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la suppression:', err);
+      console.error('Réponse serveur:', err.response?.data);
+      toast({
+        title: 'Erreur',
+        description: err.response?.data?.message || 'Erreur lors de la suppression de la facture',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Fonction pour relancer une facture
+  const handleRelancer = async (facture: Facture & { client: Client }) => {
+    try {
+      // TODO: Implémenter l'envoi d'email de relance côté backend
+      console.log(`📧 Relance envoyée pour la facture ${facture.numero}`);
+      
+      toast({
+        title: 'Relance envoyée',
+        description: `Une relance a été envoyée à ${facture.client.email || facture.client.nom_societe}`,
+      });
+    } catch (err: any) {
+      console.error('❌ Erreur lors de l\'envoi de la relance:', err);
+      toast({
+        title: 'Erreur',
+        description: 'Erreur lors de l\'envoi de la relance',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Fonction pour imprimer/télécharger le PDF
+  const handlePrintPDF = async (facture: Facture & { client: Client }) => {
+    try {
+      console.log(`🖨️ Téléchargement du PDF pour la facture ${facture.id}`);
+      
+      // Ouvrir le PDF dans un nouvel onglet
+      window.open(`http://127.0.0.1:8000/api/factures/${facture.id}/pdf`, '_blank');
+      
+      toast({
+        title: 'PDF généré',
+        description: 'Le PDF de la facture a été ouvert dans un nouvel onglet.',
+      });
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la génération du PDF:', err);
+      toast({
+        title: 'Erreur',
+        description: 'Erreur lors de la génération du PDF',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Ajoute info client à chaque facture
+  const facturesWithClient = facturesList.map(f => ({
     ...f,
-    client: getClientById(f.client_id)!,
+    client: clientsMap[f.clientId],
   }));
 
   const filteredFactures = facturesWithClient.filter(
-    f =>
-      f.numero_facture.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.client.nom_societe.toLowerCase().includes(searchQuery.toLowerCase())
+    (facture) =>
+      facture.numero.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (facture.client?.nom_societe || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleDelete = (facture: Facture) => {
-    setFactures(prev => prev.filter(f => f.id !== facture.id));
-    toast({
-      title: 'Facture supprimée',
-      description: `La facture ${facture.numero_facture} a été supprimée.`,
-      variant: 'destructive',
-    });
-  };
-
-  const handleRelancer = (facture: Facture & { client: Client }) => {
-    toast({
-      title: 'Relance envoyée',
-      description: `Une relance a été envoyée à ${facture.client.email}`,
-    });
-  };
 
   const columns = [
     {
       key: 'numero',
       header: 'N° Facture',
       render: (item: Facture & { client: Client }) => (
-        <span className="font-mono font-medium text-foreground">{item.numero_facture}</span>
+        <span className="font-mono font-medium text-foreground">{item.numero}</span>
       ),
     },
     {
@@ -103,30 +178,34 @@ const FacturesPage: React.FC = () => {
       header: 'Client',
       render: (item: Facture & { client: Client }) => (
         <button
-          onClick={e => {
+          onClick={(e) => {
             e.stopPropagation();
-            navigate(`/clients/${item.client_id}`);
+            navigate(`/clients/${item.clientId}`);
           }}
           className="text-primary hover:underline font-medium"
         >
-          {item.client.nom_societe}
+          {item.client?.nom_societe || '—'}
         </button>
       ),
     },
     {
       key: 'totalTTC',
       header: 'Montant',
-      render: (item: Facture) => <span className="font-semibold">{formatCurrency(item.totalTTC)}</span>,
+      render: (item: Facture) => (
+        <span className="font-semibold">{formatCurrency(item.totalTTC)}</span>
+      ),
     },
     {
       key: 'dateFacturation',
       header: 'Date',
-      render: (item: Facture) => format(item.dateFacturation, 'dd MMM yyyy', { locale: fr }),
+      render: (item: Facture) =>
+        item.dateFacturation ? format(item.dateFacturation, 'dd MMM yyyy', { locale: fr }) : '-',
     },
     {
       key: 'dateEcheance',
       header: 'Échéance',
       render: (item: Facture) => {
+        if (!item.dateEcheance) return '-';
         const isOverdue = !item.estPayee && isBefore(item.dateEcheance, today);
         return (
           <span className={isOverdue ? 'text-destructive font-medium' : ''}>
@@ -139,6 +218,7 @@ const FacturesPage: React.FC = () => {
       key: 'status',
       header: 'Statut',
       render: (item: Facture) => {
+        if (!item.dateEcheance) return <StatusBadge variant="unpaid" />;
         const isOverdue = !item.estPayee && isBefore(item.dateEcheance, today);
         return <StatusBadge variant={item.estPayee ? 'paid' : isOverdue ? 'overdue' : 'unpaid'} />;
       },
@@ -150,31 +230,58 @@ const FacturesPage: React.FC = () => {
       render: (item: Facture & { client: Client }) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={e => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/factures/${item.id}`)}>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/clients/${item.clientId}/factures/${item.id}`);
+              }}
+            >
               <Eye className="h-4 w-4 mr-2" />
               Voir
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate(`/factures/${item.id}/edit`)}>
+
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/clients/${item.clientId}/factures/${item.id}/edit`);
+              }}
+            >
               <Edit className="h-4 w-4 mr-2" />
               Modifier
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {}}>
+
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrintPDF(item);
+              }}
+            >
               <Printer className="h-4 w-4 mr-2" />
-              Imprimer
+              Imprimer PDF
             </DropdownMenuItem>
+
             {!item.estPayee && (
-              <DropdownMenuItem onClick={() => handleRelancer(item)}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRelancer(item);
+                }}
+              >
                 <Send className="h-4 w-4 mr-2" />
                 Relancer
               </DropdownMenuItem>
             )}
+
             <DropdownMenuItem
-              onClick={() => handleDelete(item)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteFacture(item);
+              }}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -186,11 +293,15 @@ const FacturesPage: React.FC = () => {
     },
   ];
 
-  if (loading) return <div className="flex justify-center items-center h-96">Chargement...</div>;
+  if (loading)
+    return <p className="text-center mt-10">Chargement des factures...</p>;
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Factures" description="Gérez toutes les factures clients" />
+      <PageHeader 
+        title="Factures" 
+        description="Gérez toutes les factures clients" 
+      />
 
       {/* Search */}
       <Card>
@@ -200,7 +311,7 @@ const FacturesPage: React.FC = () => {
             <Input
               placeholder="Rechercher par numéro ou client..."
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -211,7 +322,7 @@ const FacturesPage: React.FC = () => {
       <DataTable
         data={filteredFactures}
         columns={columns}
-        onRowClick={item => navigate(`/factures/${item.id}`)}
+        onRowClick={(item) => navigate(`/clients/${item.clientId}/factures/${item.id}`)}
         emptyMessage="Aucune facture trouvée"
       />
     </div>

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { format, isBefore, isValid, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import axios from 'axios';
+import api from '@/lib/axios'; // ← Votre instance configurée
 
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,9 +80,9 @@ const ClientDevisDetail: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const devisRes = await axios.get(`http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}`);
-        const clientRes = await axios.get(`http://127.0.0.1:8000/api/clients/${clientId}`);
-        const facturesRes = await axios.get(`http://127.0.0.1:8000/api/clients/${clientId}/devis/${devisId}/factures`);
+        const devisRes = await api.get(`/api/clients/${clientId}/devis/${devisId}`);
+        const clientRes = await api.get(`/api/clients/${clientId}`);
+        const facturesRes = await api.get(`/api/clients/${clientId}/devis/${devisId}/factures`);
         
         console.log('Devis reçu:', devisRes.data);
         console.log('Factures reçues:', facturesRes.data);

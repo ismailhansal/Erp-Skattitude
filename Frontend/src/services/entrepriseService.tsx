@@ -1,39 +1,5 @@
 // src/services/entrepriseService.ts
-import axios from 'axios';
-
-const API_URL = 'http://127.0.0.1:8000/api';
-
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-});
-
-// Intercepteur pour logger les requêtes (debug)
-api.interceptors.request.use(
-  (config) => {
-    console.log('🚀 Requête API:', config.method?.toUpperCase(), config.url, config.data);
-    return config;
-  },
-  (error) => {
-    console.error('❌ Erreur requête:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Intercepteur pour logger les réponses (debug)
-api.interceptors.response.use(
-  (response) => {
-    console.log('✅ Réponse API:', response.status, response.data);
-    return response;
-  },
-  (error) => {
-    console.error('❌ Erreur réponse:', error.response?.status, error.response?.data);
-    return Promise.reject(error);
-  }
-);
+import api from '@/lib/axios';
 
 export interface EntrepriseData {
   id?: number;
@@ -56,13 +22,13 @@ export interface EntrepriseData {
 export const entrepriseService = {
   // Récupérer la configuration de l'entreprise
   getConfiguration: async (): Promise<EntrepriseData> => {
-    const response = await api.get('/entreprise');
+    const response = await api.get('/api/entreprise');
     return response.data;
   },
 
   // Sauvegarder l'entreprise (création ou mise à jour automatique)
   saveEntreprise: async (data: Partial<EntrepriseData>): Promise<EntrepriseData> => {
-    const response = await api.post('/entreprise', data);
+    const response = await api.post('/api/entreprise', data);
     return response.data;
   },
 

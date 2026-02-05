@@ -1,8 +1,11 @@
 <?php
 return [
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*',  'sanctum/csrf-cookie','login','logout','register','password/*', '/'],
     'allowed_methods' => ['*'],
-    'allowed_origins' => ['http://localhost:8080'], // ton front
+    'allowed_origins' => [
+        'http://127.0.0.1:8080',
+        'http://127.0.0.1:8000',
+    ],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
     'exposed_headers' => [],

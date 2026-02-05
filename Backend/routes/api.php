@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Hash;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DevisController;
 use App\Http\Controllers\FactureController;
@@ -12,12 +13,13 @@ use App\Http\Controllers\Pdf\FacturePdfController;
 
 
 
-// Exemple utilisateur authentifié (resté par défaut)
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
 
-// --- Routes API pour Skattitude ---
+Route::middleware(['web', 'auth'])->get('/user', function (Request $request) {
+    return $request->user();
+});
+
+Route::middleware(['web', 'auth'])->group(function () {
+
 
 // CRUD Clients
 Route::apiResource('clients', ClientController::class);
@@ -85,3 +87,5 @@ Route::delete('/clients/{client}/devis/{devisId}', [DevisController::class, 'des
 
 // Supprimer une facture spécifique d'un client
 Route::delete('/clients/{client}/factures/{factureId}', [FactureController::class, 'destroy']);
+
+});

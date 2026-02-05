@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import axios from 'axios';
+import api from '@/lib/axios'; // ← Votre instance configurée
 import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Devis, Client } from '@/types';
@@ -36,13 +36,13 @@ const DevisPage: React.FC = () => {
   useEffect(() => {
     const fetchDevis = async () => {
       try {
-        const devisRes = await axios.get<any[]>('http://127.0.0.1:8000/api/devis');
+        const devisRes = await api.get<any[]>('/api/devis');
         const clientsIds = Array.from(new Set(devisRes.data.map(d => d.client_id)));
         
         // Fetch info clients
         const clientsMapTemp: Record<number, Client> = {};
         await Promise.all(clientsIds.map(async (id) => {
-          const res = await axios.get<Client>(`http://127.0.0.1:8000/api/clients/${id}`);
+          const res = await api.get<Client>(`/api/clients/${id}`);
           clientsMapTemp[id] = {
             ...res.data,
             id: Number(res.data.id),
@@ -86,7 +86,7 @@ const DevisPage: React.FC = () => {
     try {
       console.log(`🗑️ Suppression du devis ${devis.id} pour le client ${devis.clientId}`);
       
-      await axios.delete(`http://127.0.0.1:8000/api/clients/${devis.clientId}/devis/${devis.id}`);
+      await api.delete(`/api/clients/${devis.clientId}/devis/${devis.id}`);
       
       // Mettre à jour la liste locale
       setDevisList(prev => prev.filter(d => d.id !== devis.id));

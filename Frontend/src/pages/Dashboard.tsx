@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '@/lib/axios'; // ← Votre instance configurée
 import { 
   Receipt, 
   FileText, 
@@ -66,9 +66,9 @@ const Dashboard: React.FC = () => {
       
       // Récupérer les données en parallèle
       const [facturesRes, devisRes, clientsRes] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/api/factures'),
-        axios.get('http://127.0.0.1:8000/api/devis'),
-        axios.get('http://127.0.0.1:8000/api/clients'),
+        api.get('/api/factures'),
+        api.get('/api/devis'),
+        api.get('/api/clients'),
       ]);
 
       console.log('📊 Données dashboard chargées:', {

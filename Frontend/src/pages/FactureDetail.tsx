@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { format, isBefore, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import axios from 'axios';
+import api from '@/lib/axios'; // ← Votre instance configurée
 
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FacturePrintView } from '@/components/documents/FacturePrintView';
 import { useToast } from '@/hooks/use-toast';
+import axios from '@/lib/axios';
 
 interface LigneFacture {
   id: number;
@@ -99,7 +100,7 @@ const FactureDetails: React.FC = () => {
     const fetchFacture = async () => {
       try {
         setLoading(true);
-        const res = await axios.get<Facture>(`http://127.0.0.1:8000/api/factures/${id}`);
+        const res = await api.get<Facture>(`http://127.0.0.1:8000/api/factures/${id}`);
         setFacture(res.data);
       } catch (err) {
         console.error(err);

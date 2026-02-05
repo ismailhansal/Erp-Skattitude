@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '@/lib/axios'; // ← Votre instance configurée
 import { 
   Receipt, 
   Calendar, 
@@ -100,7 +100,7 @@ const ClientFactureDetail: React.FC = () => {
     const fetchFacture = async () => {
       try {
         setLoading(true);
-        const res = await axios.get<Facture>(`http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`);
+        const res = await api.get<Facture>(`/api/clients/${clientId}/factures/${factureId}`);
         setFacture(res.data);
         console.log('FACTURE:', res.data);
         console.log('LIGNES:', res.data.lignes);
@@ -116,7 +116,7 @@ const ClientFactureDetail: React.FC = () => {
 
   const downloadFacturePDF = () => {
     window.open(
-      `http://127.0.0.1:8000/api/factures/${factureId}/pdf`,
+      `${api.defaults.baseURL}/api/factures/${factureId}/pdf`,
       '_blank'
     );
   };
@@ -133,8 +133,8 @@ const ClientFactureDetail: React.FC = () => {
     if (!facture) return;
     
     try {
-      await axios.put(
-        `http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}/mark-paid`
+      await api.put(
+        `/api/clients/${clientId}/factures/${factureId}/mark-paid`
       );
       
       toast({
@@ -143,8 +143,8 @@ const ClientFactureDetail: React.FC = () => {
       });
       
       // Recharger la facture pour mettre à jour le statut
-      const res = await axios.get<Facture>(
-        `http://127.0.0.1:8000/api/clients/${clientId}/factures/${factureId}`
+      const res = await api.get<Facture>(
+        `/api/clients/${clientId}/factures/${factureId}`
       );
       setFacture(res.data);
       
