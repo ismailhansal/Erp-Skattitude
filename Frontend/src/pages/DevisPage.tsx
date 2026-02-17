@@ -52,19 +52,27 @@ const DevisPage: React.FC = () => {
         setClientsMap(clientsMapTemp);
 
         // Map devis
-        setDevisList(
-          devisRes.data.map(d => ({
-            ...d,
-            id: d.id.toString(),
-            clientId: d.client_id,
-            numero: d.numero_devis,
-            totalTTC: Number(d.total_ttc) || 0,
-            dateCreation: d.created_at ? new Date(d.created_at) : null,
-            dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
-            estFacture: d.statut === 'facturé',
-            statut: d.statut,
-          }))
-        );
+       setDevisList(
+  devisRes.data
+    .map(d => ({
+      ...d,
+      id: d.id.toString(),
+      clientId: d.client_id,
+      numero: d.numero_devis,
+      totalTTC: Number(d.total_ttc) || 0,
+      dateCreation: d.created_at ? new Date(d.created_at) : null,
+      dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
+      estFacture: d.statut === 'facturé',
+      statut: d.statut,
+    }))
+    // 🔥 TRI PAR DATE DE CRÉATION (DESC)
+    .sort(
+      (a, b) =>
+        (b.dateCreation?.getTime() ?? 0) -
+        (a.dateCreation?.getTime() ?? 0)
+    )
+);
+
 
         setLoading(false);
       } catch (err) {

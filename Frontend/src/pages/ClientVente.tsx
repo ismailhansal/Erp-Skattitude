@@ -38,55 +38,69 @@ const ClientVente: React.FC = () => {
 
         // Récupération des devis
         const devisRes = await api.get<any[]>(`/api/clients/${clientId}/devis`);
-        setDevis(
-          devisRes.data.map(d => {
-            // Construire une description depuis les lignes
-            let description = 'Aucune prestation';
-            if (d.lignes && d.lignes.length > 0) {
-              description = d.lignes[0].description;
-              if (d.lignes.length > 1) {
-                description += ` (+${d.lignes.length - 1} autre${d.lignes.length > 2 ? 's' : ''})`;
-              }
-            }
+ setDevis(
+  devisRes.data
+    .map(d => {
+      let description = 'Aucune prestation';
+      if (d.lignes && d.lignes.length > 0) {
+        description = d.lignes[0].description;
+        if (d.lignes.length > 1) {
+          description += ` (+${d.lignes.length - 1} autre${d.lignes.length > 2 ? 's' : ''})`;
+        }
+      }
 
-            return {
-              ...d,
-              id: d.id.toString(),
-              numero: d.numero_devis || '',
-              totalTTC: parseFloat(d.total_ttc) || 0,
-              description, // Description construite depuis les lignes
-              estFacture: d.statut === 'facturé',
-              dateCreation: d.created_at ? new Date(d.created_at) : null,
-              dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
-            };
-          })
-        );
+      return {
+        ...d,
+        id: d.id.toString(),
+        numero: d.numero_devis || '',
+        totalTTC: parseFloat(d.total_ttc) || 0,
+        description,
+        estFacture: d.statut === 'facturé',
+        dateCreation: d.created_at ? new Date(d.created_at) : null,
+        dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
+      };
+    })
+    // 🔥 TRI PAR DATE DE CRÉATION (DESC)
+    .sort(
+      (a, b) =>
+        (b.dateCreation?.getTime() ?? 0) -
+        (a.dateCreation?.getTime() ?? 0)
+    )
+);
+
 
         // Récupération des factures
         const facturesRes = await api.get<any[]>(`/api/clients/${clientId}/factures`);
-        setFactures(
-          facturesRes.data.map(f => {
-            // Construire une description depuis les lignes
-            let description = 'Aucune prestation';
-            if (f.lignes && f.lignes.length > 0) {
-              description = f.lignes[0].description;
-              if (f.lignes.length > 1) {
-                description += ` (+${f.lignes.length - 1} autre${f.lignes.length > 2 ? 's' : ''})`;
-              }
-            }
+       setFactures(
+  facturesRes.data
+    .map(f => {
+      let description = 'Aucune prestation';
+      if (f.lignes && f.lignes.length > 0) {
+        description = f.lignes[0].description;
+        if (f.lignes.length > 1) {
+          description += ` (+${f.lignes.length - 1} autre${f.lignes.length > 2 ? 's' : ''})`;
+        }
+      }
 
-            return {
-              ...f,
-              id: f.id.toString(),
-              totalTTC: parseFloat(f.total_ttc) || 0,
-              numero: f.numero_facture || '',
-              description, // Description construite depuis les lignes
-              estPayee: f.statut === 'payé',
-              dateFacturation: f.created_at ? new Date(f.created_at) : null,
-              dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
-            };
-          })
-        );
+      return {
+        ...f,
+        id: f.id.toString(),
+        totalTTC: parseFloat(f.total_ttc) || 0,
+        numero: f.numero_facture || '',
+        description,
+        estPayee: f.statut === 'payé',
+        dateFacturation: f.created_at ? new Date(f.created_at) : null,
+        dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
+      };
+    })
+    // 🔥 TRI PAR DATE DE FACTURATION (DESC)
+    .sort(
+      (a, b) =>
+        (b.dateFacturation?.getTime() ?? 0) -
+        (a.dateFacturation?.getTime() ?? 0)
+    )
+);
+
 
         setLoading(false);
       } catch (err) {

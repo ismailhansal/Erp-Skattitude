@@ -50,20 +50,28 @@ const FacturesPage: React.FC = () => {
 
         setClientsMap(clientsMapTemp);
 
-        // Map factures
-        setFacturesList(
-          facturesRes.data.map(f => ({
-            ...f,
-            id: f.id.toString(),
-            clientId: f.client_id,
-            numero: f.numero_facture,
-            totalTTC: Number(f.total_ttc) || 0,
-            estPayee: f.statut === 'payé',
-            dateFacturation: f.created_at ? new Date(f.created_at) : null,
-            dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
-            statut: f.statut,
-          }))
-        );
+      // Map + tri factures
+setFacturesList(
+  facturesRes.data
+    .map(f => ({
+      ...f,
+      id: f.id.toString(),
+      clientId: f.client_id,
+      numero: f.numero_facture,
+      totalTTC: Number(f.total_ttc) || 0,
+      estPayee: f.statut === 'payé',
+      dateFacturation: f.created_at ? new Date(f.created_at) : null,
+      dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
+      statut: f.statut,
+    }))
+    // 🔥 TRI PAR DATE DE FACTURATION (DESC)
+    .sort(
+      (a, b) =>
+        (b.dateFacturation?.getTime() ?? 0) -
+        (a.dateFacturation?.getTime() ?? 0)
+    )
+);
+
 
         setLoading(false);
       } catch (err) {

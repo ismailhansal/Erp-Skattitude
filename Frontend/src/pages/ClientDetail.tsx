@@ -48,66 +48,68 @@ const ClientDetail: React.FC = () => {
           `/api/clients/${clientId}/devis`
         );
 
-        setDevis(
-          devisRes.data.map(d => {
-            // Construire une description depuis les lignes
-            let description = 'Aucune prestation';
-            if (d.lignes && d.lignes.length > 0) {
-              // Prendre la première ligne
-              description = d.lignes[0].description;
-              
-              // Si plusieurs lignes, ajouter un compteur
-              if (d.lignes.length > 1) {
-                description += ` (+${d.lignes.length - 1} autre${d.lignes.length > 2 ? 's' : ''})`;
-              }
-            }
+     setDevis(
+  devisRes.data
+    .map(d => ({
+      ...d,
+      id: d.id.toString(),
+      numero: d.numero_devis || '',
+      totalTTC: Number(d.total_ttc) || 0,
+      description: d.lignes?.length
+        ? d.lignes[0].description +
+          (d.lignes.length > 1 ? ` (+${d.lignes.length - 1} autre${d.lignes.length > 2 ? 's' : ''})` : '')
+        : 'Aucune prestation',
+      dateCreation: d.created_at ? new Date(d.created_at) : null,
+      dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
+      estFacture: d.statut === 'facturé',
+      statut: d.statut,
+    }))
+    .sort(
+      (a, b) =>
+        (b.dateCreation?.getTime() ?? 0) -
+        (a.dateCreation?.getTime() ?? 0)
+    )
+);
 
-            return {
-              ...d,
-              id: d.id.toString(),
-              numero: d.numero_devis || '',
-              totalTTC: Number(d.total_ttc) || 0,
-              description, // Description construite depuis les lignes
-              dateCreation: d.created_at ? new Date(d.created_at) : null,
-              dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
-              estFacture: d.statut === 'facturé',
-              statut: d.statut,
-            };
-          })
-        );
 
         // 3️⃣ Factures
-        const facturesRes = await api.get<any[]>(
-          `/api/clients/${clientId}/factures`
-        );
+       const facturesRes = await api.get<any[]>(
+  `/api/clients/${clientId}/factures`
+);
 
-        setFactures(
-          facturesRes.data.map(f => {
-            // Construire une description depuis les lignes
-            let description = 'Aucune prestation';
-            if (f.lignes && f.lignes.length > 0) {
-              // Prendre la première ligne
-              description = f.lignes[0].description;
-              
-              // Si plusieurs lignes, ajouter un compteur
-              if (f.lignes.length > 1) {
-                description += ` (+${f.lignes.length - 1} autre${f.lignes.length > 2 ? 's' : ''})`;
-              }
-            }
+setFactures(
+  facturesRes.data
+    .map(f => {
+      // Construire une description depuis les lignes
+      let description = 'Aucune prestation';
+      if (f.lignes && f.lignes.length > 0) {
+        description = f.lignes[0].description;
 
-            return {
-              ...f,
-              id: f.id.toString(),
-              numero: f.numero_facture || '',
-              totalTTC: Number(f.total_ttc) || 0,
-              description, // Description construite depuis les lignes
-              dateFacturation: f.created_at ? new Date(f.created_at) : null,
-              dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
-              estPayee: f.statut === 'payé',
-              statut: f.statut,
-            };
-          })
-        );
+        if (f.lignes.length > 1) {
+          description += ` (+${f.lignes.length - 1} autre${f.lignes.length > 2 ? 's' : ''})`;
+        }
+      }
+
+      return {
+        ...f,
+        id: f.id.toString(),
+        numero: f.numero_facture || '',
+        totalTTC: Number(f.total_ttc) || 0,
+        description,
+        dateFacturation: f.created_at ? new Date(f.created_at) : null,
+        dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
+        estPayee: f.statut === 'payé',
+        statut: f.statut,
+      };
+    })
+    // 🔥 TRI DU PLUS RÉCENT AU PLUS ANCIEN
+    .sort(
+      (a, b) =>
+        (b.dateFacturation?.getTime() ?? 0) -
+        (a.dateFacturation?.getTime() ?? 0)
+    )
+);
+
 
         setLoading(false);
       } catch (err) {
