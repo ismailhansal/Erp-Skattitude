@@ -185,11 +185,20 @@ const ClientFactureDetail: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader
-        title={`Facture ${facture.numero_facture}`}
-        description={`Client: ${facture.client.nom_societe} • Émise le ${formatDate(facture.date_facture)}`}
-        showBack
-        backPath={`/clients/${clientId}/vente`}
+     <PageHeader
+  title={`Facture ${facture.numero_facture}`}
+  description={`Client: ${facture.client.nom_societe} • Émise le ${formatDate(facture.date_facture)}`}
+  showBack
+onBack={() => {
+  if (document.referrer.includes('/dashboard')) {
+    navigate('/dashboard');
+  } else {
+    navigate(-1);
+  }
+}}
+
+
+
         actions={
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={downloadFacturePDF}>

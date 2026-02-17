@@ -182,6 +182,7 @@ const ClientVente: React.FC = () => {
       header: 'N° Devis', 
       render: (item: Devis) => <span className="font-mono font-medium">{item.numero}</span> 
     },
+    /*
     { 
       key: 'description', 
       header: 'Description', 
@@ -190,7 +191,7 @@ const ClientVente: React.FC = () => {
           {item.description}
         </span>
       )
-    },
+    },*/
     { 
       key: 'totalttc', 
       header: 'Montant', 
@@ -278,6 +279,7 @@ const ClientVente: React.FC = () => {
       header: 'N° Facture', 
       render: (item: Facture) => <span className="font-mono font-medium">{item.numero}</span> 
     },
+    /*
     { 
       key: 'description', 
       header: 'Description', 
@@ -286,7 +288,7 @@ const ClientVente: React.FC = () => {
           {item.description}
         </span>
       )
-    },
+    },*/
     { 
       key: 'totalttc', 
       header: 'Montant', 

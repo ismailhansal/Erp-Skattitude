@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate,  useLocation } from 'react-router-dom';
 import { 
   FileText, Calendar, Printer, Edit, Receipt,
   Truck, ArrowLeft
@@ -62,6 +62,8 @@ const formatSafeDate = (date: Date | null, formatStr: string = 'dd MMMM yyyy'): 
 const ClientDevisDetail: React.FC = () => {
   const { clientId, devisId } = useParams<{ clientId: string; devisId: string }>();
   const navigate = useNavigate();
+  const location = useLocation(); // <-- récupérer le state de navigation
+
   const today = new Date();
 
   const [devis, setDevis] = useState<any>(null);
@@ -75,6 +77,14 @@ const ClientDevisDetail: React.FC = () => {
   const formatCurrency = (amount: number) => {
     const safeAmount = Number(amount) || 0;
     return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(safeAmount);
+  };
+
+    const handleBack = () => {
+    if (location.state?.fromDashboard) {
+      navigate('/dashboard'); // retour vers le dashboard
+    } else {
+      navigate(-1); // retour à la page précédente
+    }
   };
 
   useEffect(() => {
@@ -194,10 +204,20 @@ const downloadDevisPDF = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title={`Devis ${devis.numero_devis || 'N/A'}`}
-        description={`Client: ${client.nom_societe || 'N/A'} • Créé le ${formatSafeDate(devis.dateCreation)}`}
-        showBack
-        backPath={`/clients/${clientId}/vente`}
+      title={`Devis ${devis.numero_devis || 'N/A'}`}
+  description={`Client: ${client.nom_societe || 'N/A'} • Créé le ${formatSafeDate(devis.dateCreation)}`}
+  showBack
+ onBack={() => {
+  if (document.referrer.includes('/dashboard')) {
+    navigate('/dashboard');
+  } else {
+    navigate(-1);
+  }
+}}
+
+        
+        
+         // <-- nouvelle prop pour le callback
         actions={
           <div className="flex gap-2 flex-wrap">
             <Dialog open={showBLPrint} onOpenChange={setShowBLPrint}>

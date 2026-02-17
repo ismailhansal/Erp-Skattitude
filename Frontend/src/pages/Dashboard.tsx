@@ -433,31 +433,36 @@ const Dashboard: React.FC = () => {
 
       {/* Tables */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Factures du mois */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-semibold">
-              Factures du mois ({facturesDuMois.length})
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/factures')}
-              className="text-primary"
-            >
-              Voir tout
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <DataTable
-              data={facturesDuMois}
-              columns={facturesColumns}
-              onRowClick={(item) => navigate(`/factures/${item.id}`)}
-              emptyMessage="Aucune facture ce mois"
-            />
-          </CardContent>
-        </Card>
+     {/* Factures du mois */}
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle className="text-lg font-semibold">
+      Factures du mois ({facturesDuMois.length})
+    </CardTitle>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => navigate('/factures')}
+      className="text-primary"
+    >
+      Voir tout
+      <ChevronRight className="h-4 w-4 ml-1" />
+    </Button>
+  </CardHeader>
+  <CardContent>
+    <DataTable<Facture>
+      data={facturesDuMois}
+      columns={facturesColumns}
+  onRowClick={(item) =>
+    navigate(`/clients/${item.client_id}/factures/${item.id}`, {
+      state: { fromDashboard: true }
+    })
+  }
+        emptyMessage="Aucune facture ce mois"
+    />
+  </CardContent>
+</Card>
+
 
         {/* Devis du mois */}
         <Card>
@@ -468,7 +473,7 @@ const Dashboard: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/devis')}
+              onClick={() => navigate(`/clients/${clientId}/devis`)}
               className="text-primary"
             >
               Voir tout
@@ -476,12 +481,18 @@ const Dashboard: React.FC = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            <DataTable
-              data={devisDuMois}
-              columns={devisColumns}
-              onRowClick={(item) => navigate(`/devis/${item.id}`)}
-              emptyMessage="Aucun devis ce mois"
-            />
+           <DataTable<Devis>
+  data={devisDuMois}
+  columns={devisColumns}
+// Dans ton Dashboard
+onRowClick={(item) =>
+  navigate(`/clients/${item.client_id}/devis/${item.id}`, {
+    state: { fromDashboard: true }
+  })
+}
+  emptyMessage="Aucun devis ce mois"
+/>
+
           </CardContent>
         </Card>
       </div>

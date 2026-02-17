@@ -9,6 +9,7 @@ interface PageHeaderProps {
   description?: string;
   showBack?: boolean;
   backPath?: string;
+  onBack?: () => void; // <-- ajouté
   actions?: React.ReactNode;
   className?: string;
 }
@@ -18,16 +19,19 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   description,
   showBack = false,
   backPath,
+  onBack,
   actions,
   className,
 }) => {
   const navigate = useNavigate();
 
   const handleBack = () => {
-    if (backPath) {
+    if (onBack) {
+      onBack(); // priorité au callback fourni
+    } else if (backPath) {
       navigate(backPath);
     } else {
-      navigate(-1);
+      navigate(-1); // fallback : revenir à la page précédente
     }
   };
 
@@ -57,3 +61,4 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     </div>
   );
 };
+

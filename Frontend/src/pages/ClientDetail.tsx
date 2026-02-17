@@ -189,6 +189,8 @@ setFactures(
       header: 'N° Devis', 
       render: (item: Devis) => <span className="font-mono font-medium">{item.numero}</span> 
     },
+    //activer description
+    /*
     { 
       key: 'description', 
       header: 'Description', 
@@ -197,7 +199,7 @@ setFactures(
           {item.description}
         </span>
       )
-    },
+    },*/
     { 
       key: 'totalttc', 
       header: 'Montant', 
