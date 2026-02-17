@@ -1,15 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '@/lib/axios'; // ← Votre instance configurée
 import { 
-  Receipt, 
-  Calendar, 
-  Printer, 
-  Edit, 
-  Send,
-  FileText,
-  ArrowLeft,
-  CheckCircle2
+  Receipt, Calendar, Printer, Edit, Send, FileText, ArrowLeft, CheckCircle2, Loader2
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,55 +10,9 @@ import { Separator } from '@/components/ui/separator';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { format, isBefore, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useFactureDetail } from '@/hooks/useFactureDetail';
 import { useToast } from '@/hooks/use-toast';
-
-interface LigneFacture {
-  id: number;
-  description: string;
-  quantite: number;
-  nombre_jours: number;
-  prix_unitaire: number;
-  tva: number;
-}
-
-interface Client {
-  id: number;
-  nom_societe: string;
-  ice: string;
-  email: string;
-  adresse: string;
-  ville: string;
-  pays: string;
-  telephone: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Devis {
-  id: number;
-  numero_devis: string;
-  date_creation: string;
-  date_evenement: string;
-  description: string;
-  created_at: string;
-  bon_commande?: string;
-}
-
-interface Facture {
-  id: number;
-  numero_facture: string;
-  date_facture: string;
-  date_echeance: string;
-  condition_reglement: string;
-  statut: string;
-  sous_total: number;
-  total_ttc: number;
-  created_at: string;
-  updated_at: string;
-  client: Client;
-  devis?: Devis;
-  lignes: LigneFacture[];
-}
+import api from '@/lib/axios';
 
 const ClientFactureDetail: React.FC = () => {
   const { clientId, factureId } = useParams<{ clientId: string; factureId: string }>();
@@ -74,11 +20,9 @@ const ClientFactureDetail: React.FC = () => {
   const { toast } = useToast();
   const today = new Date();
 
-  const [facture, setFacture] = useState<Facture | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // ✅ Hook React Query
+  const { facture, isLoading, marquerPayee } = useFactureDetail(clientId!, factureId!);
 
-  // Helper safe pour parser les dates
   const parseDateSafe = (dateStr?: string) => {
     if (!dateStr) return null;
     try {
@@ -96,29 +40,8 @@ const ClientFactureDetail: React.FC = () => {
   const formatCurrency = (amount: number | string) =>
     new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(Number(amount));
 
-  useEffect(() => {
-    const fetchFacture = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get<Facture>(`/api/clients/${clientId}/factures/${factureId}`);
-        setFacture(res.data);
-        console.log('FACTURE:', res.data);
-        console.log('LIGNES:', res.data.lignes);
-      } catch (err) {
-        console.error(err);
-        setError('Impossible de charger la facture.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFacture();
-  }, [clientId, factureId]);
-
   const downloadFacturePDF = () => {
-    window.open(
-      `${api.defaults.baseURL}/api/factures/${factureId}/pdf`,
-      '_blank'
-    );
+    window.open(`${api.defaults.baseURL}/api/factures/${factureId}/pdf`, '_blank');
   };
 
   const handleRelancer = () => {
@@ -129,45 +52,28 @@ const ClientFactureDetail: React.FC = () => {
     });
   };
 
-  const handleMarquerPayee = async () => {
-    if (!facture) return;
-    
-    try {
-      await api.put(
-        `/api/clients/${clientId}/factures/${factureId}/mark-paid`
-      );
-      
-      toast({
-        title: 'Facture marquée comme payée',
-        description: `La facture ${facture.numero_facture} a été marquée comme payée.`,
-      });
-      
-      // Recharger la facture pour mettre à jour le statut
-      const res = await api.get<Facture>(
-        `/api/clients/${clientId}/factures/${factureId}`
-      );
-      setFacture(res.data);
-      
-    } catch (error) {
-      console.error('Erreur lors du marquage de la facture:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de marquer la facture comme payée.',
-        variant: 'destructive',
-      });
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Chargement de la facture...</p>
+        </div>
+      </div>
+    );
+  }
 
-  if (loading) return <p>Chargement...</p>;
-  if (error || !facture) return (
-    <div className="flex flex-col items-center justify-center h-96 gap-4">
-      <p className="text-muted-foreground">{error || 'Facture non trouvée'}</p>
-      <Button variant="outline" onClick={() => navigate(`/clients/${clientId}/vente`)}>
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Retour aux ventes
-      </Button>
-    </div>
-  );
+  if (!facture) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-4">
+        <p className="text-muted-foreground">Facture non trouvée</p>
+        <Button variant="outline" onClick={() => navigate(`/clients/${clientId}/vente`)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Retour aux ventes
+        </Button>
+      </div>
+    );
+  }
 
   const isOverdue = facture.statut !== 'payé' && parseDateSafe(facture.date_echeance) && isBefore(parseDateSafe(facture.date_echeance)!, today);
   const getStatus = () => {
@@ -176,7 +82,6 @@ const ClientFactureDetail: React.FC = () => {
     return 'unpaid';
   };
 
-  // Calcul de la TVA
   const tva_calcul = facture.lignes.reduce((acc, ligne) => {
     const totalHT = ligne.quantite * ligne.nombre_jours * ligne.prix_unitaire;
     const tvaMontant = totalHT * (ligne.tva / 100);
@@ -185,20 +90,17 @@ const ClientFactureDetail: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-     <PageHeader
-  title={`Facture ${facture.numero_facture}`}
-  description={`Client: ${facture.client.nom_societe} • Émise le ${formatDate(facture.date_facture)}`}
-  showBack
-onBack={() => {
-  if (document.referrer.includes('/dashboard')) {
-    navigate('/dashboard');
-  } else {
-    navigate(-1);
-  }
-}}
-
-
-
+      <PageHeader
+        title={`Facture ${facture.numero_facture}`}
+        description={`Client: ${facture.client.nom_societe} • Émise le ${formatDate(facture.date_facture)}`}
+        showBack
+        onBack={() => {
+          if (document.referrer.includes('/dashboard')) {
+            navigate('/dashboard');
+          } else {
+            navigate(-1);
+          }
+        }}
         actions={
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={downloadFacturePDF}>
@@ -217,7 +119,7 @@ onBack={() => {
                   <Send className="h-4 w-4 mr-2" />
                   Relancer
                 </Button>
-                <Button onClick={handleMarquerPayee}>
+                <Button onClick={() => marquerPayee()}>
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Marquer payée
                 </Button>

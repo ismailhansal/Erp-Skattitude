@@ -1,13 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate,  useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  FileText, Calendar, Printer, Edit, Receipt,
-  Truck, ArrowLeft
+  FileText, Calendar, Printer, Edit, Receipt, Truck, ArrowLeft, Loader2 
 } from 'lucide-react';
-import { format, isBefore, isValid, parseISO } from 'date-fns';
+import { format, isBefore, isValid } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import api from '@/lib/axios'; // ← Votre instance configurée
-
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,44 +13,8 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DevisPrintView } from '@/components/documents/DevisPrintView';
 import { BonLivraisonPrintView } from '@/components/documents/BonLivraisonPrintView';
+import { useDevisDetail } from '@/hooks/useDevisDetail';
 
-
-
-
-
-
-
-// Fonction utilitaire pour parser les dates en toute sécurité
-const parseSafeDate = (dateString: any): Date | null => {
-  if (!dateString) return null;
-  
-  try {
-    // Si c'est déjà une Date valide
-    if (dateString instanceof Date && isValid(dateString)) {
-      return dateString;
-    }
-    
-    // Si c'est une chaîne, essayer de la parser
-    if (typeof dateString === 'string') {
-      const parsed = parseISO(dateString);
-      if (isValid(parsed)) {
-        return parsed;
-      }
-      
-      // Fallback : new Date()
-      const fallback = new Date(dateString);
-      if (isValid(fallback)) {
-        return fallback;
-      }
-    }
-    
-    return null;
-  } catch {
-    return null;
-  }
-};
-
-// Fonction pour formater une date ou retourner un texte par défaut
 const formatSafeDate = (date: Date | null, formatStr: string = 'dd MMMM yyyy'): string => {
   if (!date || !isValid(date)) return 'Date non disponible';
   return format(date, formatStr, { locale: fr });
@@ -62,110 +23,30 @@ const formatSafeDate = (date: Date | null, formatStr: string = 'dd MMMM yyyy'): 
 const ClientDevisDetail: React.FC = () => {
   const { clientId, devisId } = useParams<{ clientId: string; devisId: string }>();
   const navigate = useNavigate();
-  const location = useLocation(); // <-- récupérer le state de navigation
-
   const today = new Date();
-
-  const [devis, setDevis] = useState<any>(null);
-  const [client, setClient] = useState<any>(null);
-  const [facturesAssociees, setFacturesAssociees] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const [showDevisPrint, setShowDevisPrint] = useState(false);
   const [showBLPrint, setShowBLPrint] = useState(false);
+
+  // ✅ Hook React Query
+  const { devis, client, facturesAssociees, isLoading } = useDevisDetail(clientId!, devisId!);
 
   const formatCurrency = (amount: number) => {
     const safeAmount = Number(amount) || 0;
     return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(safeAmount);
   };
 
-    const handleBack = () => {
-    if (location.state?.fromDashboard) {
-      navigate('/dashboard'); // retour vers le dashboard
-    } else {
-      navigate(-1); // retour à la page précédente
-    }
+  const downloadDevisPDF = () => {
+    window.open(`http://127.0.0.1:8000/api/devis/${devisId}/pdf`, '_blank');
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const devisRes = await api.get(`/api/clients/${clientId}/devis/${devisId}`);
-        const clientRes = await api.get(`/api/clients/${clientId}`);
-        const facturesRes = await api.get(`/api/clients/${clientId}/devis/${devisId}/factures`);
-        
-        console.log('Devis reçu:', devisRes.data);
-        console.log('Factures reçues:', facturesRes.data);
-
-        const d = devisRes.data;
-        
-        // Parser les dates en toute sécurité
-        const dateCreation = parseSafeDate(d.created_at) || new Date();
-        const dateEvenement = parseSafeDate(d.date_evenement) || new Date();
-        
-        // Convertir les lignes avec protection complète
-        let lignesConverties = [];
-        if (d.lignes && Array.isArray(d.lignes) && d.lignes.length > 0) {
-          lignesConverties = d.lignes.map((ligne: any) => ({
-            id: ligne.id || Math.random(),
-            description: String(ligne.description || ''),
-            quantiteHotesses: Number(ligne.quantite) || Number(ligne.quantite_hotesses) || 1,
-            nombreJours: Number(ligne.nombre_jours) || 1,
-            prixUnitaire: Number(ligne.prix_unitaire) || 0,
-            tva: Number(ligne.tva) || 20,
-          }));
-        }
-
-        setDevis({
-          ...d,
-          dateCreation,
-          dateEvenement,
-          estFacture: d.statut === 'facturé',
-          lignes: lignesConverties,
-          sousTotal: Number(d.sous_total) || 0,
-          montantTva: Number(d.montant_tva) || 0,
-          totalTTC: Number(d.total_ttc) || 0,
-        });
-
-        setClient(clientRes.data);
-
-        // Gérer les factures (peut être un objet ou un tableau)
-        let facturesData = [];
-        if (facturesRes.data) {
-          if (Array.isArray(facturesRes.data)) {
-            facturesData = facturesRes.data;
-          } else if (typeof facturesRes.data === 'object' && facturesRes.data.id) {
-            // Si c'est un objet unique avec un id, le transformer en tableau
-            facturesData = [facturesRes.data];
-          }
-        }
-
-        setFacturesAssociees(
-          facturesData.map(f => ({
-            ...f,
-            id: String(f.id || ''),
-            date_facture: parseSafeDate(f.date_facture),
-            date_echeance: parseSafeDate(f.date_echeance),
-            total_ttc: Number(f.total_ttc) || 0,
-          }))
-        );
-
-        setLoading(false);
-      } catch (err) {
-        console.error('Erreur chargement devis:', err);
-        setLoading(false);
-      }
-    };
-
-    if (clientId && devisId) {
-      fetchData();
-    }
-  }, [clientId, devisId]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <p className="text-muted-foreground">Chargement...</p>
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Chargement du devis...</p>
+        </div>
       </div>
     );
   }
@@ -182,7 +63,6 @@ const ClientDevisDetail: React.FC = () => {
     );
   }
 
-  // Vérifier si l'événement est passé (avec protection date valide)
   const isPast = devis.dateEvenement && isValid(devis.dateEvenement) 
     ? isBefore(devis.dateEvenement, today) && !devis.estFacture
     : false;
@@ -193,31 +73,19 @@ const ClientDevisDetail: React.FC = () => {
     return 'pending';
   };
 
-const downloadDevisPDF = () => {
-  window.open(
-    `http://127.0.0.1:8000/api/devis/${devisId}/pdf`,
-    '_blank'
-  );
-};
-
-
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-      title={`Devis ${devis.numero_devis || 'N/A'}`}
-  description={`Client: ${client.nom_societe || 'N/A'} • Créé le ${formatSafeDate(devis.dateCreation)}`}
-  showBack
- onBack={() => {
-  if (document.referrer.includes('/dashboard')) {
-    navigate('/dashboard');
-  } else {
-    navigate(-1);
-  }
-}}
-
-        
-        
-         // <-- nouvelle prop pour le callback
+        title={`Devis ${devis.numero_devis || 'N/A'}`}
+        description={`Client: ${client.nom_societe || 'N/A'} • Créé le ${formatSafeDate(devis.dateCreation)}`}
+        showBack
+        onBack={() => {
+          if (document.referrer.includes('/dashboard')) {
+            navigate('/dashboard');
+          } else {
+            navigate(-1);
+          }
+        }}
         actions={
           <div className="flex gap-2 flex-wrap">
             <Dialog open={showBLPrint} onOpenChange={setShowBLPrint}>
@@ -235,18 +103,10 @@ const downloadDevisPDF = () => {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={showDevisPrint} onOpenChange={setShowDevisPrint}>
-              <Button variant="outline" onClick={downloadDevisPDF}>
-  <Printer className="h-4 w-4 mr-2" />
-  Imprimer Devis
-</Button>
-
-      <DialogContent className="max-w-full w-full p-0 overflow-auto bg-transparent print:max-w-full print:p-0">
-  <DevisPrintView devis={devis} client={client} />
-</DialogContent>
-
-
-            </Dialog>
+            <Button variant="outline" onClick={downloadDevisPDF}>
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimer Devis
+            </Button>
 
             <Button 
               variant="outline" 

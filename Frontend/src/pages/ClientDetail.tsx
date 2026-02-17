@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '@/lib/axios'; // ← Votre instance configurée
 import { 
-  Building2, MapPin, Phone, Mail, FileText, Receipt, Plus, ExternalLink 
+  Building2, MapPin, Phone, Mail, FileText, Receipt, Plus, ExternalLink, Loader2 
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Client, Devis, Facture } from '@/types';
+import { Devis, Facture } from '@/types';
 import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -19,168 +18,34 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
+import { useClientDetail } from '@/hooks/useClientDetail';
 
 const ClientDetail: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const today = new Date();
 
-  const [client, setClient] = useState<Client | null>(null);
-  const [devis, setDevis] = useState<Devis[]>([]);
-  const [factures, setFactures] = useState<Facture[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ✅ Utiliser le hook React Query
+  const { client, devis, factures, isLoading, deleteDevis, deleteFacture } = useClientDetail(clientId!);
 
-  useEffect(() => {
-    const fetchClientData = async () => {
-      try {
-        // 1️⃣ Client
-        const clientRes = await api.get<Client>(
-          `/api/clients/${clientId}`
-        );
-
-        setClient({
-          ...clientRes.data,
-          id: clientRes.data.id.toString(),
-        });
-
-        // 2️⃣ Devis
-        const devisRes = await api.get<any[]>(
-          `/api/clients/${clientId}/devis`
-        );
-
-     setDevis(
-  devisRes.data
-    .map(d => ({
-      ...d,
-      id: d.id.toString(),
-      numero: d.numero_devis || '',
-      totalTTC: Number(d.total_ttc) || 0,
-      description: d.lignes?.length
-        ? d.lignes[0].description +
-          (d.lignes.length > 1 ? ` (+${d.lignes.length - 1} autre${d.lignes.length > 2 ? 's' : ''})` : '')
-        : 'Aucune prestation',
-      dateCreation: d.created_at ? new Date(d.created_at) : null,
-      dateEvenement: d.date_evenement ? new Date(d.date_evenement) : null,
-      estFacture: d.statut === 'facturé',
-      statut: d.statut,
-    }))
-    .sort(
-      (a, b) =>
-        (b.dateCreation?.getTime() ?? 0) -
-        (a.dateCreation?.getTime() ?? 0)
-    )
-);
-
-
-        // 3️⃣ Factures
-       const facturesRes = await api.get<any[]>(
-  `/api/clients/${clientId}/factures`
-);
-
-setFactures(
-  facturesRes.data
-    .map(f => {
-      // Construire une description depuis les lignes
-      let description = 'Aucune prestation';
-      if (f.lignes && f.lignes.length > 0) {
-        description = f.lignes[0].description;
-
-        if (f.lignes.length > 1) {
-          description += ` (+${f.lignes.length - 1} autre${f.lignes.length > 2 ? 's' : ''})`;
-        }
-      }
-
-      return {
-        ...f,
-        id: f.id.toString(),
-        numero: f.numero_facture || '',
-        totalTTC: Number(f.total_ttc) || 0,
-        description,
-        dateFacturation: f.created_at ? new Date(f.created_at) : null,
-        dateEcheance: f.date_echeance ? new Date(f.date_echeance) : null,
-        estPayee: f.statut === 'payé',
-        statut: f.statut,
-      };
-    })
-    // 🔥 TRI DU PLUS RÉCENT AU PLUS ANCIEN
-    .sort(
-      (a, b) =>
-        (b.dateFacturation?.getTime() ?? 0) -
-        (a.dateFacturation?.getTime() ?? 0)
-    )
-);
-
-
-        setLoading(false);
-      } catch (err) {
-        console.error(err);
-        setLoading(false);
-      }
-    };
-
-    fetchClientData();
-  }, [clientId]);
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount);
 
   // Fonction pour supprimer un devis
   const handleDeleteDevis = async (devisId: string) => {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce devis ?')) {
       return;
     }
-
-    try {
-      console.log(`🗑️ Suppression du devis ${devisId} pour le client ${clientId}`);
-      
-      await api.delete(`/api/clients/${clientId}/devis/${devisId}`);
-      
-      // Mettre à jour la liste locale
-      setDevis(prev => prev.filter(d => d.id !== devisId));
-      
-      console.log('✅ Devis supprimé avec succès');
-      alert('Devis supprimé avec succès');
-    } catch (err: any) {
-      console.error('❌ Erreur lors de la suppression:', err);
-      console.error('Réponse serveur:', err.response?.data);
-      alert('Erreur lors de la suppression du devis');
-    }
+    deleteDevis(devisId);
   };
 
-  // Fonction pour supprimer une facture (si besoin)
+  // Fonction pour supprimer une facture
   const handleDeleteFacture = async (factureId: string) => {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette facture ?')) {
       return;
     }
-
-    try {
-      console.log(`🗑️ Suppression de la facture ${factureId} pour le client ${clientId}`);
-      
-      await api.delete(`/api/clients/${clientId}/factures/${factureId}`);
-      
-      // Mettre à jour la liste locale
-      setFactures(prev => prev.filter(f => f.id !== factureId));
-      
-      console.log('✅ Facture supprimée avec succès');
-      alert('Facture supprimée avec succès');
-    } catch (err: any) {
-      console.error('❌ Erreur lors de la suppression:', err);
-      console.error('Réponse serveur:', err.response?.data);
-      alert('Erreur lors de la suppression de la facture');
-    }
+    deleteFacture(factureId);
   };
-
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
-  if (!client)
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">Client non trouvé</p>
-      </div>
-    );
-
-  const totalCA = factures
-    .filter(f => f.estPayee)
-    .reduce((acc, f) => acc + f.totalTTC, 0);
-
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount);
 
   // Colonnes Devis
   const devisColumns = [
@@ -189,17 +54,6 @@ setFactures(
       header: 'N° Devis', 
       render: (item: Devis) => <span className="font-mono font-medium">{item.numero}</span> 
     },
-    //activer description
-    /*
-    { 
-      key: 'description', 
-      header: 'Description', 
-      render: (item: Devis) => (
-        <span className="font-medium text-sm max-w-xs truncate block" title={item.description}>
-          {item.description}
-        </span>
-      )
-    },*/
     { 
       key: 'totalttc', 
       header: 'Montant', 
@@ -255,7 +109,6 @@ setFactures(
               <Eye className="h-4 w-4 mr-2" />
               Voir
             </DropdownMenuItem>
-
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
@@ -265,7 +118,6 @@ setFactures(
               <Edit className="h-4 w-4 mr-2" />
               Modifier
             </DropdownMenuItem>
-
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
@@ -338,7 +190,6 @@ setFactures(
               <Eye className="h-4 w-4 mr-2" />
               Voir
             </DropdownMenuItem>
-
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
@@ -348,7 +199,6 @@ setFactures(
               <Edit className="h-4 w-4 mr-2" />
               Modifier
             </DropdownMenuItem>
-
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
@@ -364,6 +214,30 @@ setFactures(
       ),
     },
   ];
+
+  // ✅ Afficher un loader pendant le chargement
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Chargement des données client...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!client) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">Client non trouvé</p>
+      </div>
+    );
+  }
+
+  const totalCA = factures
+    .filter(f => f.estPayee)
+    .reduce((acc, f) => acc + f.totalTTC, 0);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -399,7 +273,7 @@ setFactures(
                 <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                 <div>
                   <p className="font-medium">{client.adresse}</p>
-                  <p className="text-muted-foreground"> {client.ville}, {client.pays}</p>
+                  <p className="text-muted-foreground">{client.ville}, {client.pays}</p>
                 </div>
               </div>
             </div>

@@ -6,10 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { MainLayout } from "@/components/layout/MainLayout";
-
-//context pour config entreprise
 import { EntrepriseProvider } from "@/contexts/EntrepriseContext";
-
+import { Loader2 } from "lucide-react";
 
 // Pages
 import Login from "./pages/Login";
@@ -28,23 +26,56 @@ import Comptabilite from "./pages/Comptabilite";
 import Configuration from "./pages/Configuration";
 import NotFound from "./pages/NotFound";
 
-// Client-scoped pages (independent workflow)
+// Client-scoped pages
 import ClientDevisDetail from "./pages/clients/ClientDevisDetail";
 import ClientFactureDetail from "./pages/clients/ClientFactureDetail";
 import ClientDevisForm from "./pages/clients/ClientDevisForm";
 import ClientFactureForm from "./pages/clients/ClientFactureForm";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false, // Ne pas refetch au focus
+    },
+  },
+});
+
+// Loading screen
+const LoadingScreen = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="text-center space-y-4">
+      <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+      <p className="text-muted-foreground">Chargement...</p>
+    </div>
+  </div>
+);
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return <LoadingScreen />; // ← FIX : Afficher un loader au lieu de rediriger
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
   return <>{children}</>;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return <LoadingScreen />; // ← FIX : Afficher un loader
+  }
+  
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
   return <>{children}</>;
 };
 
@@ -57,17 +88,18 @@ const AppRoutes = () => {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="comptabilite" element={<Comptabilite />} />
         
-        {/* Module Clients - avec workflow intégré */}
+        {/* Module Clients */}
         <Route path="clients" element={<Clients />} />
         <Route path="clientstest" element={<Clienttest />} />
-
         <Route path="clients/:clientId" element={<ClientDetail />} />
         <Route path="clients/:clientId/vente" element={<ClientVente />} />
+        
         {/* Routes devis dans contexte client */}
         <Route path="clients/:clientId/devis/nouveau" element={<ClientDevisForm />} />
         <Route path="clients/:clientId/devis/:devisId" element={<ClientDevisDetail />} />
         <Route path="clients/:clientId/devis/:devisId/edit" element={<ClientDevisForm />} />
         <Route path="clients/:clientId/devis/:devisId/facturer" element={<ClientFactureForm />} />
+        
         {/* Routes factures dans contexte client */}
         <Route path="clients/:clientId/factures/:factureId" element={<ClientFactureDetail />} />
         <Route path="clients/:clientId/factures/:factureId/edit" element={<ClientFactureForm />} />
@@ -94,20 +126,19 @@ const AppRoutes = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <EntrepriseProvider> {/* <-- ici */}
-            <BrowserRouter>
+      <BrowserRouter> {/* ← FIX : Avant AuthProvider */}
+        <AuthProvider>
+          <EntrepriseProvider> {/* ← FIX : Après AuthProvider */}
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
               <AppRoutes />
-            </BrowserRouter>
+            </TooltipProvider>
           </EntrepriseProvider>
-        </TooltipProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </ThemeProvider>
   </QueryClientProvider>
 );
-
 
 export default App;
