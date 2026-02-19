@@ -14,8 +14,8 @@ export const useClients = () => {
       const res = await api.get<Client[]>('/api/clients');
       return res.data.map(c => ({ ...c, id: c.id.toString() }));
     },
-    staleTime: 5 * 60 * 1000, // ← CACHE 5 MINUTES (pas de refetch pendant 5min)
-    gcTime: 10 * 60 * 1000, // ← Garde en mémoire 10 minutes
+staleTime: Infinity, // ✅ Cache indéfiniment
+    gcTime: 24 * 60 * 60 * 1000, // ✅ 24 heures
   });
 
   // ✅ Créer un client

@@ -13,7 +13,8 @@ export const useClientDetail = (clientId: string) => {
       const res = await api.get(`/api/clients/${clientId}`);
       return { ...res.data, id: res.data.id.toString() };
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity, // ✅ Cache indéfiniment
+    gcTime: 24 * 60 * 60 * 1000, // ✅ 24 heures
   });
 
   // Fetch devis du client
@@ -37,7 +38,7 @@ export const useClientDetail = (clientId: string) => {
         }))
         .sort((a: any, b: any) => (b.dateCreation?.getTime() ?? 0) - (a.dateCreation?.getTime() ?? 0));
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 24 * 60 * 60 * 1000, // 24h
     enabled: !!clientId,
   });
 
@@ -62,7 +63,7 @@ export const useClientDetail = (clientId: string) => {
         }))
         .sort((a: any, b: any) => (b.dateFacturation?.getTime() ?? 0) - (a.dateFacturation?.getTime() ?? 0));
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 24 * 60 * 60 * 1000, // 24h
     enabled: !!clientId,
   });
 

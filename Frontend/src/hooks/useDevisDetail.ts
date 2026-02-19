@@ -31,7 +31,8 @@ export const useDevisDetail = (clientId: string, devisId: string) => {
         totalTTC: Number(d.total_ttc) || 0,
       };
     },
-    staleTime: 5 * 60 * 1000,
+   staleTime: Infinity, // ✅ Cache indéfiniment
+    gcTime: 24 * 60 * 60 * 1000, // ✅ 24 heures
     enabled: !!clientId && !!devisId,
   });
 
@@ -41,7 +42,8 @@ export const useDevisDetail = (clientId: string, devisId: string) => {
       const res = await api.get(`/api/clients/${clientId}`);
       return res.data;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity, // ✅ Cache indéfiniment
+    gcTime: 24 * 60 * 60 * 1000, // ✅ 24 heures
     enabled: !!clientId,
   });
 
@@ -65,7 +67,8 @@ export const useDevisDetail = (clientId: string, devisId: string) => {
         total_ttc: Number(f.total_ttc) || 0,
       }));
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity, // ✅ Cache indéfiniment
+    gcTime: 24 * 60 * 60 * 1000, // ✅ 24 heures
     enabled: !!clientId && !!devisId,
   });
 

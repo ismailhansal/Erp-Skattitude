@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,11 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import api from '@/lib/axios'; // ← Votre instance configurée
+import { useFactureForm } from '@/hooks/useFactureForm';
 
-
-// Types
 interface LigneDocument {
   id?: number;
   description: string;
@@ -23,45 +20,6 @@ interface LigneDocument {
   tva: number;
 }
 
-interface Client {
-  id: number;
-  nom_societe: string;
-}
-
-interface Devis {
-  id: number;
-  client_id: number;
-  numero_devis: string;
-  condition_reglement: string;
-  lignes: Array<{
-    id: number;
-    description: string;
-    quantite: number;
-    nombre_jours: number;
-    prix_unitaire: number;
-    tva: number;
-  }>;
-}
-
-interface Facture {
-  id: number;
-  client_id: number;
-  devis_id?: number;
-  numero_facture: string;
-  date_facture: string;
-  date_echeance: string;
-  condition_reglement: string;
-  lignes: Array<{
-    id: number;
-    description: string;
-    quantite: number;
-    nombre_jours: number;
-    prix_unitaire: number;
-    tva: number;
-  }>;
-}
-
-// Utilitaires
 const formatDateForInput = (dateString?: string | null): string => {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -71,20 +29,25 @@ const formatDateForInput = (dateString?: string | null): string => {
 const getTodayDate = (): string => new Date().toISOString().split('T')[0];
 
 const ClientFactureForm: React.FC = () => {
-  const { clientId, devisId, factureId } = useParams<{ clientId: string; devisId?: string; factureId?: string }>();
+  const { clientId, devisId, factureId } = useParams<{ 
+    clientId: string; 
+    devisId?: string; 
+    factureId?: string 
+  }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
-  const isEditFacture = !!factureId;
-  const isCreateFromDevis = !!devisId && !factureId;
+  // ✅ Hook React Query
+  const { 
+    client, 
+    factureData, 
+    sourceDevis, 
+    isLoading, 
+    saveFacture, 
+    isSaving,
+    isEditFacture,
+    isCreateFromDevis 
+  } = useFactureForm(clientId!, factureId, devisId);
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const [client, setClient] = useState<Client | null>(null);
-  const [sourceDevis, setSourceDevis] = useState<Devis | null>(null);
-
-  // Formulaire
   const [dateFacture, setDateFacture] = useState(getTodayDate());
   const [dateEcheance, setDateEcheance] = useState('');
   const [conditionReglement, setConditionReglement] = useState('30 jours fin de mois');
@@ -92,7 +55,7 @@ const ClientFactureForm: React.FC = () => {
     { description: '', quantite: 1, nombreJours: 1, prixUnitaire: '', tva: 20 }
   ]);
 
-  // Calcul date d'échéance
+  // Calcul automatique date d'échéance
   useEffect(() => {
     if (!dateFacture) return;
     const date = new Date(dateFacture);
@@ -116,124 +79,103 @@ const ClientFactureForm: React.FC = () => {
     setDateEcheance(date.toISOString().split('T')[0]);
   }, [dateFacture, conditionReglement]);
 
-  // Chargement données client / devis / facture
+  // Charger les données de la facture (édition)
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        // Client
-       const { data: clientData } = await api.get(`/api/clients/${clientId}`);
-        setClient(clientData);
+    if (factureData && isEditFacture) {
+      setDateFacture(formatDateForInput(factureData.date_facture) || getTodayDate());
+      setDateEcheance(formatDateForInput(factureData.date_echeance));
+      setConditionReglement(factureData.condition_reglement || '30 jours fin de mois');
 
+      const lignesFacture = factureData.lignes.length
+        ? factureData.lignes.map((l: any) => ({
+            id: l.id,
+            description: String(l.description || ''),
+            quantite: Number(l.quantite || 1),
+            nombreJours: Number(l.nombre_jours || 1),
+            prixUnitaire: Number(l.prix_unitaire || 0),
+            tva: Number(l.tva || 20),
+          }))
+        : [{ description: '', quantite: 1, nombreJours: 1, prixUnitaire: '', tva: 20 }];
+      
+      setLignes(lignesFacture);
+    }
+  }, [factureData, isEditFacture]);
 
-        if (isEditFacture && factureId) {
-          // Facture
-const { data: factureData } = await api.get(
-  `/api/clients/${clientId}/factures/${factureId}`
-);
-          if (!factureData) throw new Error('Facture non trouvée');
-          setDateFacture(formatDateForInput(factureData.date_facture) || getTodayDate());
-          setDateEcheance(formatDateForInput(factureData.date_echeance));
-          setConditionReglement(factureData.condition_reglement || '30 jours fin de mois');
+  // Charger les données du devis (création depuis devis)
+  useEffect(() => {
+    if (sourceDevis && isCreateFromDevis) {
+      setConditionReglement(sourceDevis.condition_reglement || '30 jours fin de mois');
 
-          const lignesFacture = factureData.lignes.length
-            ? factureData.lignes.map(l => ({
-                id: l.id,
-                description: String(l.description || ''),
-                quantite: Number(l.quantite || 1),
-                nombreJours: Number(l.nombre_jours || 1),
-                prixUnitaire: Number(l.prix_unitaire || 0),
-                tva: Number(l.tva || 20),
+      const lignesDevis = sourceDevis.lignes.length
+        ? sourceDevis.lignes.map((l: any) => ({
+            description: String(l.description || ''),
+            quantite: Number(l.quantite || 1),
+            nombreJours: Number(l.nombre_jours || 1),
+            prixUnitaire: Number(l.prix_unitaire || 0),
+            tva: Number(l.tva || 20),
+          }))
+        : [{ description: '', quantite: 1, nombreJours: 1, prixUnitaire: '', tva: 20 }];
+      
+      setLignes(lignesDevis);
+    }
+  }, [sourceDevis, isCreateFromDevis]);
 
-              }))
-            : [{ description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }];
-          
-          setLignes(lignesFacture);
-
-        } else if (isCreateFromDevis && devisId) {
-          // Devis
-const { data: devisData } = await api.get(
-  `/api/clients/${clientId}/devis/${devisId}`
-);
-          if (!devisData) throw new Error('Devis non trouvé');
-          setSourceDevis(devisData);
-          setConditionReglement(devisData.condition_reglement || '30 jours fin de mois');
-
-          const lignesDevis = devisData.lignes.length
-            ? devisData.lignes.map(l => ({
-                description: String(l.description || ''),
-                quantite: Number(l.quantite || 1),
-                nombreJours: Number(l.nombre_jours || 1),
-                prixUnitaire: Number(l.prix_unitaire || 0),
-                tva: Number(l.tva || 20),
-              }))
-            : [{ description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }];
-          
-          setLignes(lignesDevis);
-        }
-
-      } catch (error) {
-        toast({ title: 'Erreur', description: error instanceof Error ? error.message : 'Erreur de chargement', variant: 'destructive' });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (clientId) loadData();
-  }, [clientId, devisId, factureId]);
-
-  // Calcul totaux
   const calculateTotals = () => {
     let sousTotal = 0;
     let montantTva = 0;
+    
     lignes.forEach(l => {
-      const ligneTotal = (l.quantite || 0) * (l.nombreJours || 0) * (l.prixUnitaire || 0);
+      const ligneTotal = (l.quantite || 0) * (l.nombreJours || 0) * (Number(l.prixUnitaire) || 0);
       sousTotal += ligneTotal;
       montantTva += (ligneTotal * (l.tva || 0)) / 100;
     });
+    
     return { sousTotal, montantTva, totalTTC: sousTotal + montantTva };
   };
+
   const { sousTotal, montantTva, totalTTC } = calculateTotals();
 
-  // Gestion lignes
-  const addLigne = () => setLignes([...lignes, { description: '', quantite: 1, nombreJours: 1, prixUnitaire: 0, tva: 20 }]);
-  const removeLigne = (index: number) => lignes.length > 1 && setLignes(lignes.filter((_, i) => i !== index));
+  const addLigne = () => setLignes([...lignes, { 
+    description: '', 
+    quantite: 1, 
+    nombreJours: 1, 
+    prixUnitaire: '', 
+    tva: 20 
+  }]);
+
+  const removeLigne = (index: number) => 
+    lignes.length > 1 && setLignes(lignes.filter((_, i) => i !== index));
+
   const updateLigne = (index: number, field: keyof LigneDocument, value: string | number) => {
     const newLignes = [...lignes];
     newLignes[index] = { ...newLignes[index], [field]: value };
     setLignes(newLignes);
   };
 
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount || 0);
+  const formatCurrency = (amount: number) => 
+    new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(amount || 0);
 
-  const getBackPath = () => isEditFacture ? `/clients/${clientId}/factures/${factureId}` :
-    isCreateFromDevis ? `/clients/${clientId}/devis/${devisId}` : `/clients/${clientId}/vente`;
+  const getBackPath = () => 
+    isEditFacture 
+      ? `/clients/${clientId}/factures/${factureId}` 
+      : isCreateFromDevis 
+      ? `/clients/${clientId}/devis/${devisId}` 
+      : `/clients/${clientId}/vente`;
 
-  // Soumission
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  if (!dateFacture)
-    return toast({
-      title: 'Erreur',
-      description: 'Veuillez saisir la date de facture.',
-      variant: 'destructive'
-    });
+    if (!dateFacture) {
+      return;
+    }
 
-  const invalidLigne = lignes.find(
-    l => !l.description.trim() || (Number(l.prixUnitaire) || 0) <= 0
-  );
+    const invalidLigne = lignes.find(
+      l => !l.description.trim() || (Number(l.prixUnitaire) || 0) <= 0
+    );
 
-  if (invalidLigne)
-    return toast({
-      title: 'Erreur',
-      description: 'Chaque ligne doit avoir une description et un prix > 0.',
-      variant: 'destructive'
-    });
-
-  setIsSaving(true);
-
-  try {
+    if (invalidLigne) {
+      return;
+    }
 
     const factureData = {
       date_facture: dateFacture,
@@ -243,7 +185,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         description: l.description.trim(),
         quantite: l.quantite,
         nombre_jours: l.nombreJours,
-        prix_unitaire: l.prixUnitaire,
+        prix_unitaire: Number(l.prixUnitaire),
         tva: l.tva,
       })),
       sous_total: Number(sousTotal.toFixed(2)),
@@ -251,79 +193,55 @@ const handleSubmit = async (e: React.FormEvent) => {
       montant_tva: Number(montantTva.toFixed(2)),
     };
 
-    let result: Facture;
-    let successMessage = '';
-
-    if (isEditFacture && factureId) {
-
-      const { data } = await api.put(
-        `/api/clients/${clientId}/factures/${factureId}`,
-        factureData
-      );
-
-      result = data;
-      successMessage = 'Facture modifiée avec succès';
-
-    } else if (isCreateFromDevis && devisId) {
-
-      const { data } = await api.post(
-        `/api/clients/${clientId}/devis/${devisId}/factures`,
-        factureData
-      );
-
-      result = data;
-      successMessage = 'Facture créée depuis le devis';
-
-    } else {
-
-      const { data } = await api.post(
-        `/api/clients/${clientId}/factures`,
-        factureData
-      );
-
-      result = data;
-      successMessage = 'Facture créée avec succès';
-    }
-
-    toast({
-      title: 'Succès',
-      description: `${successMessage}. N° ${result.numero_facture || ''}`
+    saveFacture(factureData, {
+      onSuccess: () => {
+        navigate(
+          isEditFacture
+            ? `/clients/${clientId}/factures/${factureId}`
+            : `/clients/${clientId}/vente`
+        );
+      },
     });
+  };
 
-    navigate(
-      isEditFacture
-        ? `/clients/${clientId}/factures/${factureId}`
-        : `/clients/${clientId}/vente`
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
     );
-
-  } catch (error) {
-
-    toast({
-      title: 'Erreur',
-      description: error instanceof Error ? error.message : 'Une erreur est survenue',
-      variant: 'destructive'
-    });
-
-  } finally {
-    setIsSaving(false);
   }
-};
 
-  
+  if (!client) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">Client non trouvé</p>
+      </div>
+    );
+  }
 
-  if (isLoading) return <div className="flex items-center justify-center h-96"><p className="text-muted-foreground">Chargement...</p></div>;
-  if (!client) return <div className="flex items-center justify-center h-96"><p className="text-muted-foreground">Client non trouvé</p></div>;
-
-  const getTitle = () => isEditFacture ? 'Modifier la facture' :
-    isCreateFromDevis ? `Créer une facture depuis le devis ${sourceDevis?.numero_devis || ''}` : 'Nouvelle facture';
+  const getTitle = () => 
+    isEditFacture 
+      ? 'Modifier la facture' 
+      : isCreateFromDevis 
+      ? `Créer une facture depuis le devis ${sourceDevis?.numero_devis || ''}` 
+      : 'Nouvelle facture';
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title={getTitle()} description={`Client: ${client.nom_societe}`} showBack backPath={getBackPath()} />
+      <PageHeader 
+        title={getTitle()} 
+        description={`Client: ${client.nom_societe}`} 
+        showBack 
+        backPath={getBackPath()} 
+      />
+      
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            
             <Card>
               <CardHeader>
                 <CardTitle>Informations générales</CardTitle>
@@ -341,10 +259,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                     type="date" 
                     value={dateFacture} 
                     onChange={e => setDateFacture(e.target.value)} 
+                    required
                   />
                 </div>
-
-                
 
                 <div className="space-y-2">
                   <Label htmlFor="dateEcheance">Date d'échéance</Label>
@@ -408,6 +325,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                         onChange={(e) => updateLigne(index, 'description', e.target.value)}
                         placeholder="Description de la prestation"
                         rows={2}
+                        required
                       />
                     </div>
 
@@ -432,7 +350,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                       </div>
                       <div className="space-y-2">
                         <Label>Prix unitaire (MAD)</Label>
-                      <Input
+                        <Input
                           type="number"
                           min="0"
                           step="0.01"
@@ -444,8 +362,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                               e.target.value === "" ? "" : parseFloat(e.target.value)
                             )
                           }
+                          required
                         />
-
                       </div>
                       <div className="space-y-2">
                         <Label>TVA</Label>
@@ -507,7 +425,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <div className="space-y-2">
                   <Button type="submit" className="w-full" disabled={isSaving}>
                     <Save className="h-4 w-4 mr-2" />
-                    {isSaving ? 'Enregistrement...' : isEditFacture ? 'Modifier la facture' : 'Créer la facture'}
+                    {isSaving 
+                      ? 'Enregistrement...' 
+                      : isEditFacture 
+                      ? 'Modifier la facture' 
+                      : 'Créer la facture'
+                    }
                   </Button>
                   <Button 
                     type="button" 

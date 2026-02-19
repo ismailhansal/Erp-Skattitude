@@ -217,7 +217,90 @@ const Clients: React.FC = () => {
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        {/* ... Votre formulaire dialog existant ... */}
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingClient ? 'Modifier le client' : 'Nouveau client'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingClient
+                ? 'Modifiez les informations du client'
+                : 'Renseignez les informations du nouveau client'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="societe">Nom de la société *</Label>
+                <Input
+                  id="societe"
+                  value={formData.nom_societe}
+                  onChange={(e) => setFormData({ ...formData, nom_societe: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="adresse">Adresse</Label>
+                <Input
+                  id="adresse"
+                  value={formData.adresse}
+                  onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ville">Ville</Label>
+                <Input
+                  id="ville"
+                  value={formData.ville}
+                  onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pays">Pays</Label>
+                <Input
+                  id="pays"
+                  value={formData.pays}
+                  onChange={(e) => setFormData({ ...formData, pays: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ice">ICE</Label>
+                <Input
+                  id="ice"
+                  value={formData.ice}
+                  onChange={(e) => setFormData({ ...formData, ice: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="telephone">Téléphone *</Label>
+                <Input
+                  id="telephone"
+                  value={formData.telephone}
+                  onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button type="submit">
+                {editingClient ? 'Enregistrer' : 'Créer le client'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
     </div>
   );

@@ -12,7 +12,8 @@ export const useFactureDetail = (clientId: string, factureId: string) => {
       const res = await api.get(`/api/clients/${clientId}/factures/${factureId}`);
       return res.data;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity, // ✅ Cache indéfiniment
+    gcTime: 24 * 60 * 60 * 1000, // ✅ 24 heures
     enabled: !!clientId && !!factureId,
   });
 
