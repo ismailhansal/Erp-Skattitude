@@ -37,8 +37,8 @@ class ClientController extends Controller
             'ville' => 'required|string',
             'pays' => 'required|string',
             'ice' => 'nullable|string',
-            'telephone' => 'required|string',
-            'email' => 'required|email',
+            'telephone' => 'nullable|string',
+            'email' => 'nullable|email',
         ]);
 
         $client = Client::create($request->only([

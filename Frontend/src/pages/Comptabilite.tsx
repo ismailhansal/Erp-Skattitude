@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '@/lib/axios'; // ← Votre instance configurée
 import { 
   Receipt, 
   FileText, 
@@ -20,15 +21,36 @@ import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { exportFacturesToCSV, exportDevisToCSV, exportClientsToCSV, generatePrintableTable, quickPDFExport } from '@/lib/exportUtils';
-import { useComptabilite } from '@/hooks/useComptabilite';
 
-interface ClientStats {
+interface Client {
   id: number;
   nom_societe: string;
   adresse?: string;
   ville?: string;
   telephone?: string;
   email?: string;
+}
+
+interface Facture {
+  id: number;
+  client_id: number;
+  numero_facture: string;
+  date_echeance: string;
+  total_ttc: number;
+  statut: string;
+}
+
+interface Devis {
+  id: number;
+  client_id: number;
+  numero_devis: string;
+  date_evenement: string;
+  created_at: string;
+  total_ttc: number;
+  statut: string;
+}
+
+interface ClientStats extends Client {
   chiffreAffaires: number;
   facturesEnRetard: number;
   devisAFacturer: number;
@@ -40,8 +62,48 @@ const Comptabilite: React.FC = () => {
   const { toast } = useToast();
   const today = new Date();
 
-  // ✅ Hook React Query
-  const { factures, devis, clients, isLoading, getClient } = useComptabilite();
+  const [factures, setFactures] = useState<Facture[]>([]);
+  const [devis, setDevis] = useState<Devis[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchComptabiliteData();
+  }, []);
+
+  const fetchComptabiliteData = async () => {
+    try {
+      setLoading(true);
+      
+      console.log('📊 Chargement des données comptabilité...');
+      
+      // Récupérer les données en parallèle
+      const [facturesRes, devisRes, clientsRes] = await Promise.all([
+        api.get('/api/factures'),
+        api.get('/api/devis'),
+        api.get('/api/clients'),
+      ]);
+
+      console.log('✅ Données chargées:', {
+        factures: facturesRes.data.length,
+        devis: devisRes.data.length,
+        clients: clientsRes.data.length,
+      });
+
+      setFactures(facturesRes.data);
+      setDevis(devisRes.data);
+      setClients(clientsRes.data);
+    } catch (error) {
+      console.error('❌ Erreur chargement comptabilité:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de charger les données de comptabilité',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-MA', {
@@ -50,49 +112,57 @@ const Comptabilite: React.FC = () => {
     }).format(amount);
   };
 
+  // Fonction pour récupérer le client
+  const getClient = (clientId: number): Client => {
+    return clients.find(c => c.id === clientId) || { 
+      id: clientId, 
+      nom_societe: 'Client inconnu' 
+    };
+  };
+
   // Calculate statistics
   const totalCA = factures
-    .filter((f: any) => f.statut === 'payé')
-    .reduce((acc: number, f: any) => acc + Number(f.total_ttc), 0);
+    .filter((f) => f.statut === 'payé')
+    .reduce((acc, f) => acc + Number(f.total_ttc), 0);
 
   const totalImpaye = factures
-    .filter((f: any) => f.statut !== 'payé')
-    .reduce((acc: number, f: any) => acc + Number(f.total_ttc), 0);
+    .filter((f) => f.statut !== 'payé')
+    .reduce((acc, f) => acc + Number(f.total_ttc), 0);
 
   const totalDevisPotentiel = devis
-    .filter((d: any) => d.statut !== 'facturé')
-    .reduce((acc: number, d: any) => acc + Number(d.total_ttc), 0);
+    .filter((d) => d.statut !== 'facturé')
+    .reduce((acc, d) => acc + Number(d.total_ttc), 0);
 
   // Client analysis
-  const clientStats: ClientStats[] = clients.map((client: any) => {
-    const clientFactures = factures.filter((f: any) => f.client_id === client.id);
-    const clientDevis = devis.filter((d: any) => d.client_id === client.id);
+  const clientStats: ClientStats[] = clients.map((client) => {
+    const clientFactures = factures.filter((f) => f.client_id === client.id);
+    const clientDevis = devis.filter((d) => d.client_id === client.id);
     
     return {
       ...client,
       chiffreAffaires: clientFactures
-        .filter((f: any) => f.statut === 'payé')
-        .reduce((acc: number, f: any) => acc + Number(f.total_ttc), 0),
+        .filter((f) => f.statut === 'payé')
+        .reduce((acc, f) => acc + Number(f.total_ttc), 0),
       facturesEnRetard: clientFactures.filter(
-        (f: any) => f.statut !== 'payé' && isBefore(new Date(f.date_echeance), today)
+        (f) => f.statut !== 'payé' && isBefore(new Date(f.date_echeance), today)
       ).length,
-      devisAFacturer: clientDevis.filter((d: any) => d.statut !== 'facturé').length,
+      devisAFacturer: clientDevis.filter((d) => d.statut !== 'facturé').length,
       potentiel: clientDevis
-        .filter((d: any) => d.statut !== 'facturé')
-        .reduce((acc: number, d: any) => acc + Number(d.total_ttc), 0),
+        .filter((d) => d.statut !== 'facturé')
+        .reduce((acc, d) => acc + Number(d.total_ttc), 0),
     };
-  }).sort((a, b) => b.chiffreAffaires - a.chiffreAffaires);
+  }).sort((a, b) => b.chiffreAffaires - a.chiffreAffaires); // Tri par CA décroissant
 
   const handleExportCSV = (type: 'factures' | 'devis' | 'clients') => {
     try {
       if (type === 'factures') {
-        const facturesForExport = factures.map((f: any) => ({
+        const facturesForExport = factures.map(f => ({
           ...f,
           client: getClient(f.client_id)
         }));
         exportFacturesToCSV(facturesForExport as any, getClient as any);
       } else if (type === 'devis') {
-        const devisForExport = devis.map((d: any) => ({
+        const devisForExport = devis.map(d => ({
           ...d,
           client: getClient(d.client_id)
         }));
@@ -118,14 +188,14 @@ const Comptabilite: React.FC = () => {
   const handleExportPDF = (type: 'factures' | 'devis') => {
     try {
       const data = type === 'factures' 
-        ? factures.map((f: any) => ({
+        ? factures.map(f => ({
             numero: f.numero_facture,
             client: getClient(f.client_id).nom_societe,
             montant: formatCurrency(Number(f.total_ttc)),
             echeance: format(new Date(f.date_echeance), 'dd/MM/yyyy'),
             statut: f.statut === 'payé' ? 'Payée' : 'Impayée'
           }))
-        : devis.map((d: any) => ({
+        : devis.map(d => ({
             numero: d.numero_devis,
             client: getClient(d.client_id).nom_societe,
             montant: formatCurrency(Number(d.total_ttc)),
@@ -171,14 +241,14 @@ const Comptabilite: React.FC = () => {
     {
       key: 'numero',
       header: 'N° Facture',
-      render: (item: any) => (
+      render: (item: Facture) => (
         <span className="font-mono font-medium">{item.numero_facture}</span>
       ),
     },
     {
       key: 'client',
       header: 'Client',
-      render: (item: any) => {
+      render: (item: Facture) => {
         const client = getClient(item.client_id);
         return (
           <button
@@ -196,12 +266,12 @@ const Comptabilite: React.FC = () => {
     {
       key: 'totalTTC',
       header: 'Montant',
-      render: (item: any) => formatCurrency(Number(item.total_ttc)),
+      render: (item: Facture) => formatCurrency(Number(item.total_ttc)),
     },
     {
       key: 'dateEcheance',
       header: 'Échéance',
-      render: (item: any) => {
+      render: (item: Facture) => {
         const dateEcheance = new Date(item.date_echeance);
         const isOverdue = item.statut !== 'payé' && isBefore(dateEcheance, today);
         return (
@@ -214,7 +284,7 @@ const Comptabilite: React.FC = () => {
     {
       key: 'status',
       header: 'Statut',
-      render: (item: any) => {
+      render: (item: Facture) => {
         const dateEcheance = new Date(item.date_echeance);
         const isOverdue = item.statut !== 'payé' && isBefore(dateEcheance, today);
         return <StatusBadge variant={item.statut === 'payé' ? 'paid' : isOverdue ? 'overdue' : 'unpaid'} />;
@@ -227,14 +297,14 @@ const Comptabilite: React.FC = () => {
     {
       key: 'numero',
       header: 'N° Devis',
-      render: (item: any) => (
+      render: (item: Devis) => (
         <span className="font-mono font-medium">{item.numero_devis}</span>
       ),
     },
     {
       key: 'client',
       header: 'Client',
-      render: (item: any) => {
+      render: (item: Devis) => {
         const client = getClient(item.client_id);
         return (
           <button
@@ -252,12 +322,12 @@ const Comptabilite: React.FC = () => {
     {
       key: 'totalTTC',
       header: 'Montant',
-      render: (item: any) => formatCurrency(Number(item.total_ttc)),
+      render: (item: Devis) => formatCurrency(Number(item.total_ttc)),
     },
     {
       key: 'dateEvenement',
       header: 'Événement',
-      render: (item: any) => {
+      render: (item: Devis) => {
         if (!item.date_evenement) return '-';
         const dateEvenement = new Date(item.date_evenement);
         const isPast = item.statut !== 'facturé' && isBefore(dateEvenement, today);
@@ -271,7 +341,7 @@ const Comptabilite: React.FC = () => {
     {
       key: 'status',
       header: 'Statut',
-      render: (item: any) => {
+      render: (item: Devis) => {
         if (!item.date_evenement) return <StatusBadge variant="pending" />;
         const dateEvenement = new Date(item.date_evenement);
         const isPast = isBefore(dateEvenement, today);
@@ -331,13 +401,10 @@ const Comptabilite: React.FC = () => {
     },
   ];
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-sm text-muted-foreground">Chargement des données...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -419,7 +486,7 @@ const Comptabilite: React.FC = () => {
               <DataTable
                 data={factures}
                 columns={facturesColumns}
-                onRowClick={(item: any) => navigate(`/clients/${item.client_id}/factures/${item.id}`)}
+                onRowClick={(item) => navigate(`/factures/${item.id}`)}
                 emptyMessage="Aucune facture"
               />
             </CardContent>
@@ -439,7 +506,7 @@ const Comptabilite: React.FC = () => {
               <DataTable
                 data={devis}
                 columns={devisColumns}
-                onRowClick={(item: any) => navigate(`/clients/${item.client_id}/devis/${item.id}`)}
+                onRowClick={(item) => navigate(`/devis/${item.id}`)}
                 emptyMessage="Aucun devis"
               />
             </CardContent>
@@ -455,7 +522,7 @@ const Comptabilite: React.FC = () => {
               <DataTable
                 data={clientStats}
                 columns={clientColumns}
-                onRowClick={(item: any) => navigate(`/clients/${item.id}`)}
+                onRowClick={(item) => navigate(`/clients/${item.id}`)}
                 emptyMessage="Aucun client"
               />
             </CardContent>

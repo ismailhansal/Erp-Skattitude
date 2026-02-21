@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '@/lib/axios'; // ← Votre instance configurée
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, MoreHorizontal, Eye, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 import { Button } from '@/components/ui/button';
@@ -21,15 +22,47 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { mockClients } from '@/data/mockData';
 import { Client } from '@/types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useClients } from '@/hooks/useClients';
+import { useToast } from '@/hooks/use-toast';
+
+
+
+
 
 const Clients: React.FC = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  //api laravel
+const [clients, setClients] = useState<Client[]>([]);
+const [loading, setLoading] = useState<boolean>(true);
+
+useEffect(() => {
+  api
+    .get<Client[]>("/api/clients")
+    .then((res) => {
+      // Transformer id en string pour DataTable
+      const mapped = res.data.map((c) => ({
+        ...c,
+        id: c.id.toString(), // <-- ici
+      }));
+      setClients(mapped);
+      setLoading(false);
+    })
+    .catch((err) => {
+      console.error(err);
+      setLoading(false);
+    });
+}, []);
+
+
+//api laravel
+
+const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState({
     nom_societe: '',
@@ -40,9 +73,6 @@ const Clients: React.FC = () => {
     telephone: '',
     email: '',
   });
-
-  // ✅ Hook React Query
-  const { clients, isLoading, createClient, updateClient, deleteClient } = useClients();
 
   const filteredClients = clients.filter(
     (client) =>
@@ -78,23 +108,66 @@ const Clients: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+    console.log('editingClient', editingClient);
+  console.log('formData', formData);
 
+
+  try {
     if (editingClient) {
-      updateClient({ id: editingClient.id, data: formData });
+      // 🔁 UPDATE
+      const res = await api.put<Client>(
+        `/api/clients/${editingClient.id}`,
+        formData
+      );
+
+      setClients(prev =>
+        prev.map(c => (c.id === editingClient.id ? res.data : c))
+      );
+
+      toast({
+        title: 'Client modifié',
+        description: `${res.data.nom_societe} a été mis à jour.`,
+      });
     } else {
-      createClient(formData);
+      // ➕ CREATE
+      const res = await api.post<Client>(
+        "/api/clients",
+        formData
+      );
+
+      setClients(prev => [...prev, res.data]);
+
+      toast({
+        title: 'Client créé',
+        description: `${res.data.nom_societe} a été ajouté.`,
+      });
     }
 
     setIsDialogOpen(false);
     setEditingClient(null);
-  };
+  } catch (err) {
+    console.error(err);
+  }
+};
+
 
   const handleDelete = async (client: Client) => {
-    if (!window.confirm(`Supprimer ${client.nom_societe} ?`)) return;
-    deleteClient(client.id);
-  };
+      try {
+        await api.delete(`/api/clients/${client.id}`);
+        setClients(prev => prev.filter(c => c.id !== client.id));
+        toast({
+          title: 'Client supprimé',
+          description: `${client.nom_societe} a été supprimé.`,
+          variant: 'destructive',
+        });
+        navigate('/clients');
+      } catch (err) {
+        console.error(err);
+      }
+};
+
 
   const columns = [
     {
@@ -129,58 +202,56 @@ const Clients: React.FC = () => {
     {
       key: 'createdAt',
       header: 'Créé le',
-      render: (item: Client) => format(new Date(item.created_at), 'dd MMM yyyy', { locale: fr }),
+      render: (item: Client) => format(item.created_at, 'dd MMM yyyy', { locale: fr }),
     },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-12',
-      render: (item: Client) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/clients/${item.id}`); }}>
-              <Eye className="h-4 w-4 mr-2" />
-              Voir
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenDialog(item); }}>
-              <Edit className="h-4 w-4 mr-2" />
-              Modifier
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => { e.stopPropagation(); handleDelete(item); }}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Supprimer
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
+            {
+              key: 'actions',
+              header: '',
+              className: 'w-12',
+              render: (item: Client) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/clients/${item.id}`);
+          }}
+        >
+          <Eye className="h-4 w-4 mr-2" />
+          Voir
+        </DropdownMenuItem>
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <PageHeader title="Clients" description="Gérez votre portefeuille clients" />
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center space-y-4">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-                <p className="text-sm text-muted-foreground">Chargement des clients...</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOpenDialog(item);
+          }}
+        >
+          <Edit className="h-4 w-4 mr-2" />
+          Modifier
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete(item);
+          }}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Supprimer
+        </DropdownMenuItem>
+
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ),
+            },
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -188,13 +259,18 @@ const Clients: React.FC = () => {
         title="Clients"
         description="Gérez votre portefeuille clients"
         actions={
-          <Button onClick={() => { setEditingClient(null); handleOpenDialog(); }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouveau client
-          </Button>
+       <Button onClick={() => {
+  setEditingClient(null); // ✅ forcer null
+  handleOpenDialog();
+}}>
+  <Plus className="h-4 w-4 mr-2" />
+  Nouveau client
+</Button>
+
         }
       />
 
+      {/* Search */}
       <Card>
         <CardContent className="pt-6">
           <div className="relative">
@@ -209,6 +285,7 @@ const Clients: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Table */}
       <DataTable
         data={filteredClients}
         columns={columns}
@@ -216,6 +293,7 @@ const Clients: React.FC = () => {
         emptyMessage="Aucun client trouvé"
       />
 
+      {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -255,6 +333,7 @@ const Clients: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="pays">Pays</Label>
                 <Input
@@ -280,7 +359,7 @@ const Clients: React.FC = () => {
                   required
                 />
               </div>
-              <div className="col-span-2 space-y-2">
+              <div className="space-y-2">
                 <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"

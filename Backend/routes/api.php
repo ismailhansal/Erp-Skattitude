@@ -88,4 +88,20 @@ Route::delete('/clients/{client}/devis/{devisId}', [DevisController::class, 'des
 // Supprimer une facture spécifique d'un client
 Route::delete('/clients/{client}/factures/{factureId}', [FactureController::class, 'destroy']);
 
+Route::get('/backup-download', function () {
+    $fileName = 'skattitude_backup.sql';
+    $filePath = storage_path($fileName);
+
+    // Lancer mysqldump
+    $dbUser = env('DB_USERNAME', 'root');
+    $dbPass = env('DB_PASSWORD', '');
+    $dbName = env('DB_DATABASE', 'skattitude');
+
+    $command = "mysqldump -u{$dbUser} -p{$dbPass} {$dbName} > {$filePath}";
+    exec($command);
+
+    // Retourner le fichier en téléchargement
+    return response()->download($filePath)->deleteFileAfterSend(true);
+});
+
 });

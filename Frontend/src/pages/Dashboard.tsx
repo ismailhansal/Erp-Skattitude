@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '@/lib/axios'; // ← Votre instance configurée
 import { 
   Receipt, 
   FileText, 
@@ -15,39 +16,96 @@ import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { format, isBefore, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, isAfter, isBefore, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { useDashboard } from '@/hooks/useDashboard';
+
+interface Client {
+  id: number;
+  nom_societe: string;
+}
+
+interface Facture {
+  id: number;
+  client_id: number;
+  numero_facture: string;
+  date_echeance: string;
+  date_facture: string;
+  total_ttc: number;
+  statut: string;
+  client?: Client;
+}
+
+interface Devis {
+  id: number;
+  client_id: number;
+  numero_devis: string;
+  date_evenement: string;
+  created_at: string;
+  total_ttc: number;
+  statut: string;
+  client?: Client;
+}
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const today = new Date();
 
-  // ✅ Hook React Query
-  const { factures, devis, clients, isLoading, getClient } = useDashboard();
+  const [factures, setFactures] = useState<Facture[]>([]);
+  const [devis, setDevis] = useState<Devis[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-MA', {
-      style: 'currency',
-      currency: 'MAD',
-    }).format(amount);
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer les données en parallèle
+      const [facturesRes, devisRes, clientsRes] = await Promise.all([
+        api.get('/api/factures'),
+        api.get('/api/devis'),
+        api.get('/api/clients'),
+      ]);
+
+      console.log('📊 Données dashboard chargées:', {
+        factures: facturesRes.data.length,
+        devis: devisRes.data.length,
+        clients: clientsRes.data.length,
+      });
+
+      setFactures(facturesRes.data);
+      setDevis(devisRes.data);
+      setClients(clientsRes.data);
+    } catch (error) {
+      console.error('❌ Erreur chargement dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction pour récupérer le client
+  const getClient = (clientId: number): Client => {
+    return clients.find(c => c.id === clientId) || { id: clientId, nom_societe: 'Client inconnu' };
   };
 
   // Calculer les KPIs
-  const facturesImpayees = factures.filter((f: any) => f.statut !== 'payé');
-  const facturesEnRetard = facturesImpayees.filter((f: any) => 
+  const facturesImpayees = factures.filter((f) => f.statut !== 'payé');
+  const facturesEnRetard = facturesImpayees.filter((f) => 
     isBefore(new Date(f.date_echeance), today)
   );
   
-  const devisAFacturer = devis.filter((d: any) => d.statut !== 'facturé');
-  const devisEnRetard = devisAFacturer.filter((d: any) => 
+  const devisAFacturer = devis.filter((d) => d.statut !== 'facturé');
+  const devisEnRetard = devisAFacturer.filter((d) => 
     d.date_evenement && isBefore(new Date(d.date_evenement), today)
   );
   
   const chiffreAffaires = factures
-    .filter((f: any) => f.statut === 'payé')
-    .reduce((acc: number, f: any) => acc + Number(f.total_ttc), 0);
+    .filter((f) => f.statut === 'payé')
+    .reduce((acc, f) => acc + Number(f.total_ttc), 0);
 
   // 📊 CALCUL DU CA PAR MOIS (6 derniers mois)
   const getLast6MonthsCA = () => {
@@ -59,12 +117,12 @@ const Dashboard: React.FC = () => {
       const monthEnd = endOfMonth(monthDate);
       
       const monthCA = factures
-        .filter((f: any) => {
+        .filter((f) => {
           if (f.statut !== 'payé') return false;
           const factureDate = new Date(f.date_facture);
           return factureDate >= monthStart && factureDate <= monthEnd;
         })
-        .reduce((acc: number, f: any) => acc + Number(f.total_ttc), 0);
+        .reduce((acc, f) => acc + Number(f.total_ttc), 0);
       
       months.push({
         mois: format(monthDate, 'MMM yyyy', { locale: fr }),
@@ -78,19 +136,28 @@ const Dashboard: React.FC = () => {
 
   const caData = getLast6MonthsCA();
 
-  // Factures et devis du mois en cours
+  // Factures du mois en cours
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
   
-  const facturesDuMois = factures.filter((f: any) => {
+  const facturesDuMois = factures.filter((f) => {
     const factureDate = new Date(f.date_echeance);
     return factureDate.getMonth() === currentMonth && factureDate.getFullYear() === currentYear;
   }).slice(0, 20);
 
-  const devisDuMois = devis.filter((d: any) => {
+  const devisDuMois = devis.filter((d) => {
     const devisDate = new Date(d.created_at);
     return devisDate.getMonth() === currentMonth && devisDate.getFullYear() === currentYear;
   }).slice(0, 20);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: 'MAD',
+    }).format(amount);
+  };
+
+  
 
   // Custom Tooltip pour le graphique
   const CustomTooltip = ({ active, payload }: any) => {
@@ -110,7 +177,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'numero_facture',
       header: 'N° Facture',
-      render: (item: any) => (
+      render: (item: Facture) => (
         <span className="font-mono font-medium text-foreground">
           {item.numero_facture}
         </span>
@@ -119,7 +186,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'client',
       header: 'Client',
-      render: (item: any) => {
+      render: (item: Facture) => {
         const client = getClient(item.client_id);
         return (
           <button
@@ -137,14 +204,14 @@ const Dashboard: React.FC = () => {
     {
       key: 'total_ttc',
       header: 'Montant',
-      render: (item: any) => (
+      render: (item: Facture) => (
         <span className="font-semibold">{formatCurrency(Number(item.total_ttc))}</span>
       ),
     },
     {
       key: 'dateEcheance',
       header: 'Échéance',
-      render: (item: any) => {
+      render: (item: Facture) => {
         const dateEcheance = new Date(item.date_echeance);
         const isOverdue = item.statut !== 'payé' && isBefore(dateEcheance, today);
         return (
@@ -157,7 +224,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'status',
       header: 'Statut',
-      render: (item: any) => {
+      render: (item: Facture) => {
         const dateEcheance = new Date(item.date_echeance);
         const isOverdue = item.statut !== 'payé' && isBefore(dateEcheance, today);
         return (
@@ -170,7 +237,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'actions',
       header: '',
-      render: (item: any) => {
+      render: (item: Facture) => {
         if (item.statut !== 'payé') {
           return (
             <Button
@@ -197,7 +264,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'numero',
       header: 'N° Devis',
-      render: (item: any) => (
+      render: (item: Devis) => (
         <span className="font-mono font-medium text-foreground">
           {item.numero_devis}
         </span>
@@ -206,7 +273,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'client',
       header: 'Client',
-      render: (item: any) => {
+      render: (item: Devis) => {
         const client = getClient(item.client_id);
         return (
           <button
@@ -224,20 +291,20 @@ const Dashboard: React.FC = () => {
     {
       key: 'totalTTC',
       header: 'Montant',
-      render: (item: any) => (
+      render: (item: Devis) => (
         <span className="font-semibold">{formatCurrency(Number(item.total_ttc))}</span>
       ),
     },
     {
       key: 'dateCreation',
       header: 'Création',
-      render: (item: any) => 
+      render: (item: Devis) => 
         format(new Date(item.created_at), 'dd MMM yyyy', { locale: fr }),
     },
     {
       key: 'dateEvenement',
       header: 'Événement',
-      render: (item: any) => {
+      render: (item: Devis) => {
         if (!item.date_evenement) return '-';
         const dateEvenement = new Date(item.date_evenement);
         const isPast = item.statut !== 'facturé' && isBefore(dateEvenement, today);
@@ -251,7 +318,7 @@ const Dashboard: React.FC = () => {
     {
       key: 'status',
       header: 'Statut',
-      render: (item: any) => {
+      render: (item: Devis) => {
         if (!item.date_evenement) return <StatusBadge variant="pending" />;
         const dateEvenement = new Date(item.date_evenement);
         const isPast = isBefore(dateEvenement, today);
@@ -262,13 +329,10 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-sm text-muted-foreground">Chargement du tableau de bord...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -309,7 +373,8 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Alerts for overdue items */}
+
+            {/* Alerts for overdue items */}
       {devisEnRetard.length > 0 && (
         <Card className="border-destructive/50 bg-destructive/5">
           <CardContent className="flex items-center gap-4 py-4">
@@ -364,37 +429,40 @@ const Dashboard: React.FC = () => {
         </CardContent>
       </Card>
 
+
+
       {/* Tables */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Factures du mois */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-semibold">
-              Factures du mois ({facturesDuMois.length})
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/factures')}
-              className="text-primary"
-            >
-              Voir tout
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <DataTable
-              data={facturesDuMois}
-              columns={facturesColumns}
-              onRowClick={(item: any) =>
-                navigate(`/clients/${item.client_id}/factures/${item.id}`, {
-                  state: { fromDashboard: true }
-                })
-              }
-              emptyMessage="Aucune facture ce mois"
-            />
-          </CardContent>
-        </Card>
+     {/* Factures du mois */}
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle className="text-lg font-semibold">
+      Factures du mois ({facturesDuMois.length})
+    </CardTitle>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => navigate('/factures')}
+      className="text-primary"
+    >
+      Voir tout
+      <ChevronRight className="h-4 w-4 ml-1" />
+    </Button>
+  </CardHeader>
+  <CardContent>
+    <DataTable<Facture>
+      data={facturesDuMois}
+      columns={facturesColumns}
+  onRowClick={(item) =>
+    navigate(`/clients/${item.client_id}/factures/${item.id}`, {
+      state: { fromDashboard: true }
+    })
+  }
+        emptyMessage="Aucune facture ce mois"
+    />
+  </CardContent>
+</Card>
+
 
         {/* Devis du mois */}
         <Card>
@@ -405,7 +473,7 @@ const Dashboard: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/devis')}
+              onClick={() => navigate(`/clients/${clientId}/devis`)}
               className="text-primary"
             >
               Voir tout
@@ -413,16 +481,18 @@ const Dashboard: React.FC = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            <DataTable
-              data={devisDuMois}
-              columns={devisColumns}
-              onRowClick={(item: any) =>
-                navigate(`/clients/${item.client_id}/devis/${item.id}`, {
-                  state: { fromDashboard: true }
-                })
-              }
-              emptyMessage="Aucun devis ce mois"
-            />
+           <DataTable<Devis>
+  data={devisDuMois}
+  columns={devisColumns}
+// Dans ton Dashboard
+onRowClick={(item) =>
+  navigate(`/clients/${item.client_id}/devis/${item.id}`, {
+    state: { fromDashboard: true }
+  })
+}
+  emptyMessage="Aucun devis ce mois"
+/>
+
           </CardContent>
         </Card>
       </div>
